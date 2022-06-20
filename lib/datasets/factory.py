@@ -9,6 +9,7 @@ __sets = {}
 import datasets.tabletop_object
 import datasets.osd_object
 import datasets.ocid_object
+import datasets.dopose_dataset
 import numpy as np
 
 # tabletop object dataset
@@ -31,6 +32,13 @@ for split in ['test']:
     print(name)
     __sets[name] = (lambda split=split:
             datasets.OCIDObject(split))
+
+# DoPose UCN object dataset
+for split in ['train', 'test', 'val']:
+    name = 'dopose_dataset_{}'.format(split)
+    print(name)
+    __sets[name] = (lambda split=split:
+            datasets.DoPoseDataset(split))
 
 def get_dataset(name):
     """Get an imdb (image database) by name."""
