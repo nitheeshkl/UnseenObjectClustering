@@ -5,7 +5,7 @@ import os
 import json
 import cv2
 import numpy as np
-import imageio.v3 as imageio
+import imageio
 
 import datasets
 from fcn.config import cfg
@@ -100,16 +100,16 @@ class DoPoseDataset(data.Dataset, datasets.imdb):
         mask_file = os.path.join(self._dopose_dataset_path, "mask", "{}.png".format(file_index))
 
         # label
-        label = imageio.imread(mask_file)
+        label = np.asarray(imageio.imread(mask_file))
         # TODO: check if remap label is needed for DoPose_UCN, since the regenerated dataset has instance IDs from 1 - N
         # and background and table/container is already 0
         label = self.remap_label(label)
 
         # rgb image
-        rgb_img = imageio.imread(rgb_file)
+        rgb_img = np.asarray(imageio.imread(rgb_file))
         # depth image
         if cfg.INPUT == "DEPTH" or cfg.INPUT == "RGBD":
-            depth_img = imageio.imread(depth_file)
+            depth_img = np.asarray(imageio.imread(depth_file))
             xyz_img = self.process_depth(depth_img)
         else:
             xyz_img = None
@@ -118,6 +118,15 @@ class DoPoseDataset(data.Dataset, datasets.imdb):
             rgb_img, xyz_img, label = self.pad_crop_resize(rgb_img, xyz_img, label)
             # FIXME: check if remap_label() is needed after SYN_CROP
             # label = self.remap_label(label)
+        else:
+            scale_percent = 40 # percent of original size
+            width = int(rgb_img.shape[1] * scale_percent / 100)
+            height = int(rgb_img.shape[0] * scale_percent / 100)
+            dim = (width, height)
+
+            rgb_img = cv2.resize(rgb_img, dim)
+            xyz_img = cv2.resize(xyz_img, dim, cv2.INTER_NEAREST)
+            label = cv2.resize(label.astype(np.uint8), dim, cv2.INTER_NEAREST) 
 
         # sample label pixels
         if cfg.TRAIN.EMBEDDING_SAMPLING:
@@ -185,19 +194,19 @@ class DoPoseDataset(data.Dataset, datasets.imdb):
         return label_new
 
 
-    def pad_crop_resize(self, img, label, depth):
+    def pad_crop_resize(self, img, depth, mask):
 
         H, W, _ = img.shape
 
-        K = np.max(label)
+        K = np.max(mask)
         while True:
             if K > 0:
                 idx = np.random.randint(1, K+1)
             else:
                 idx = 0
-            foreground = (label == idx).astype(np.float32)
+            foreground = (mask == idx).astype(np.float32)
 
-            # get bbox around label
+            # get bbox around mask
             x_min, y_min, x_max, y_max = util_.mask_to_tight_box(foreground)
             cx = (x_min + x_max) / 2
             cy = (y_min + y_max) / 2
@@ -215,7 +224,7 @@ class DoPoseDataset(data.Dataset, datasets.imdb):
                 x_max = cx + y_delta / 2
 
             sidelen = x_max - x_min
-            padding_percent = np.random.uniform(cfg.TRAIN.min_padding_percentage, cfg.TRAIN.max_padding_percentange)
+            padding_percent = np.random.uniform(cfg.TRAIN.min_padding_percentage, cfg.TRAIN.max_padding_percentage)
             padding = int(round(sidelen * padding_percent))
             if padding == 0:
                 padding = 25
@@ -233,7 +242,7 @@ class DoPoseDataset(data.Dataset, datasets.imdb):
                 continue # continue to find next crop
 
             img_crop = img[y_min:y_max + 1, x_min:x_max + 1]
-            label_crop = label[y_min:y_max + 1, x_min:x_max + 1]
+            mask_crop = mask[y_min:y_max + 1, x_min:x_max + 1]
             roi = [x_min, y_min, x_max, y_max]
             if depth is not None:
                 depth_crop = depth[y_min:y_max+1, x_min:x_max+1]
@@ -243,10 +252,10 @@ class DoPoseDataset(data.Dataset, datasets.imdb):
         # resize
         s = cfg.TRAIN.SYN_CROP_SIZE
         img_crop = cv2.resize(img_crop, (s, s))
-        label_crop = cv2.resize(label_crop, (s, s), interpolation=cv2.INTER_NEAREST)
+        mask_crop = cv2.resize(mask_crop, (s, s), interpolation=cv2.INTER_NEAREST)
         if depth is not None:
             depth_crop = cv2.resize(depth_crop, (s, s), interpolation=cv2.INTER_NEAREST)
         else:
             depth_crop = None
 
-        return img_crop, depth_crop, label_crop
+        return img_crop, depth_crop, mask_crop

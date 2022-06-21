@@ -192,4 +192,4 @@ def mask_to_tight_box(mask):
     elif type(mask) == np.ndarray:
         return mask_to_tight_box_numpy(mask)
     else:
-        raise Exception("Data type {type(mask)} not understood for mask_to_tight_box...")
+        raise Exception("Data type {} not understood for mask_to_tight_box...".format(type(mask)))

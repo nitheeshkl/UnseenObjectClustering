@@ -1,4 +1,4 @@
-EXP_DIR: tabletop_object
+EXP_DIR: dopose_ucn
 INPUT: RGBD
 TRAIN:
   TRAINABLE: True
@@ -21,7 +21,7 @@ TRAIN:
   FG_THRESH_POSE: 0.5
   SNAPSHOT_INFIX: resnet34_8s_embedding_cosine_rgbd_add_crop_sampling
   SNAPSHOT_EPOCHS: 1
-  SNAPSHOT_PREFIX: seg
+  SNAPSHOT_PREFIX: dopose_seg
   USE_FLIPPED: False
   CHROMATIC: True
   ADD_NOISE: True
