@@ -7,8 +7,8 @@
 __sets = {}
 
 import datasets.tabletop_object
-import datasets.osd_object
-import datasets.ocid_object
+# import datasets.osd_object
+# import datasets.ocid_object
 import datasets.dopose_dataset
 import numpy as np
 
