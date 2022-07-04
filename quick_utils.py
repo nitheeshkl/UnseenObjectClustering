@@ -11,8 +11,12 @@ def compute_xyz(depth, camera_params):
     width = depth.shape[1]
     fx = camera_params['fx']
     fy = camera_params['fy']
-    px = camera_params['x_offset']
-    py = camera_params['y_offset']
+    if "x_offset" in camera_params.keys():
+        px = camera_params['x_offset']
+        py = camera_params['y_offset']
+    else:
+        px = camera_params['cx']
+        py = camera_params['cy']
 
     indices =  np.indices((height, width), dtype=np.float32).transpose(1,2,0) #[H,W,2]
 

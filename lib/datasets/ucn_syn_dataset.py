@@ -45,8 +45,8 @@ def compute_xyz(depth_img: np.ndarray, camera_params: dict) -> np.ndarray:
     """ Compute ordered point clouds from recorded depth image and camera intrinsics.
     """
 
-    img_width = camera_params["img_width"]
-    img_height = camera_params["img_height"]
+    img_width = camera_params["width"]
+    img_height = camera_params["height"]
     px, py = camera_params["cx"], camera_params["cy"]
     fx, fy = camera_params["fx"], camera_params["fy"]
 
