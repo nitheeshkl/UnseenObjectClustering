@@ -45,10 +45,17 @@ def compute_xyz(depth_img: np.ndarray, camera_params: dict) -> np.ndarray:
     """ Compute ordered point clouds from recorded depth image and camera intrinsics.
     """
 
-    img_width = camera_params["width"]
-    img_height = camera_params["height"]
-    px, py = camera_params["cx"], camera_params["cy"]
-    fx, fy = camera_params["fx"], camera_params["fy"]
+    # FIXME: Handle computing xyz from a rescaled image in a better way.
+    img_height = depth_img.shape[0]
+    img_width = depth_img.shape[1]
+    width = camera_params["width"]
+    height = camera_params["height"]
+
+    scale_x = img_width / width
+    scale_y = img_height / height
+
+    px, py = camera_params["cx"] * scale_x, camera_params["cy"] * scale_y
+    fx, fy = camera_params["fx"] * scale_x, camera_params["fy"] * scale_y
 
     indices = np.indices((img_height, img_width), dtype=np.float32).transpose(
         1, 2, 0
@@ -105,7 +112,8 @@ class UcnSynDataset(data.Dataset, datasets.imdb):
             self._ucn_syn_dataset_path, "rgb", "{}.png".format(file_index)
         )
         depth_file = os.path.join(
-            self._ucn_syn_dataset_path, "depth", "{}.png".format(file_index)
+            # self._ucn_syn_dataset_path, "depth", "{}.png".format(file_index)
+            self._ucn_syn_dataset_path, "depth", "{}.npy".format(file_index)
         )
         mask_file = os.path.join(
             self._ucn_syn_dataset_path, "mask", "{}.png".format(file_index)
@@ -121,7 +129,8 @@ class UcnSynDataset(data.Dataset, datasets.imdb):
         rgb_img = np.asarray(imageio.imread(rgb_file))
         # depth image
         if cfg.INPUT == "DEPTH" or cfg.INPUT == "RGBD":
-            depth_img = np.asarray(imageio.imread(depth_file))
+            # depth_img = np.asarray(imageio.imread(depth_file))
+            depth_img = np.load(depth_file)
             xyz_img = self.process_depth(depth_img)
         else:
             xyz_img = None
@@ -137,8 +146,10 @@ class UcnSynDataset(data.Dataset, datasets.imdb):
             dim = (width, height)
 
             rgb_img = cv2.resize(rgb_img, dim)
-            xyz_img = cv2.resize(xyz_img, dim, cv2.INTER_NEAREST)
-            label = cv2.resize(label.astype(np.uint8), dim, cv2.INTER_NEAREST)
+            label = cv2.resize(label.astype(np.uint8), dim, interpolation=cv2.INTER_NEAREST)
+            if cfg.INPUT == "DEPTH" or cfg.INPUT == "RGBD":
+                depth_img = cv2.resize(depth_img, dim, interpolation=cv2.INTER_NEAREST)
+                xyz_img = self.process_depth(depth_img)
 
         # sample label pixels
         if cfg.TRAIN.EMBEDDING_SAMPLING:
