@@ -78,12 +78,35 @@ def train_segnet(train_loader, network, optimizer, epoch):
         # measure elapsed time
         batch_time.update(time.time() - end)
 
+        pixel_mean = torch.tensor(cfg.PIXEL_MEANS / 255.0).float()
+
+        rgb_img = (
+            (sample["image_color"][0].permute([1, 2, 0]) + pixel_mean)
+            .detach()
+            .cpu()
+            .numpy()
+        )
+        points = sample["depth"][0].permute([1, 2, 0]).detach().cpu().numpy()
+        points = points.reshape(-1, 3)
+        mask = sample["label"][0].permute([1, 2, 0]).detach().cpu().numpy()
+        rgb_mask = mask.squeeze(2) + 1
+        points_mask = mask.reshape(-1, 1) + 2
+        points = np.concatenate([points, points_mask], axis=1)
+
+        wandb_img = wandb.Image(rgb_img, masks= {
+            "GT": {
+                "mask_data": rgb_mask
+            }
+        })
+
         wandb.log(
             {
                 "train_loss": loss,
                 "intra_cluster_loss": intra_cluster_loss,
                 "inter_cluster_loss": inter_cluster_loss,
                 "epoch": epoch,
+                "image": wandb_img,
+                "point_cloud": wandb.Object3D(points),
             }
         )
 
