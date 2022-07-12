@@ -36,6 +36,7 @@ class AverageMeter(object):
     def __repr__(self):
         return "{:.3f} ({:.3f})".format(self.val, self.avg)
 
+
 def normalize(mat):
     min, max = mat.min(), mat.max()
 
@@ -45,6 +46,7 @@ def normalize(mat):
     norm = (norm - min) / scale
 
     return norm
+
 
 def normalize_descriptor(res, stats=None):
     """
@@ -60,8 +62,8 @@ def normalize_descriptor(res, stats=None):
         res_min = res.min()
         res_max = res.max()
     else:
-        res_min = np.array(stats['min'])
-        res_max = np.array(stats['max'])
+        res_min = np.array(stats["min"])
+        res_max = np.array(stats["max"])
 
     normed_res = np.clip(res, res_min, res_max)
     eps = 1e-10
@@ -69,8 +71,8 @@ def normalize_descriptor(res, stats=None):
     normed_res = (normed_res - res_min) / scale
     return normed_res
 
+
 def feature_tensor_to_img(features):
-    print(features.shape)
     i = 0
     height, width = features.shape[-2:]
     channels = 3
@@ -103,9 +105,14 @@ def validate_segnet(val_loader, network, epoch):
             depth = None
         label = sample["label"].cuda()
 
-        loss, intra_cluster_loss, inter_cluster_loss, features = network(
-            image, label, depth
-        )
+        (
+            loss,
+            intra_cluster_loss,
+            inter_cluster_loss,
+            features,
+            features_rgb,
+            features_depth,
+        ) = network(image, label, depth)
         loss = torch.sum(loss)
         intra_cluster_loss = torch.sum(intra_cluster_loss)
         inter_cluster_loss = torch.sum(inter_cluster_loss)
@@ -124,19 +131,19 @@ def validate_segnet(val_loader, network, epoch):
             .numpy()
         )
         points = sample["depth"][0].permute([1, 2, 0]).detach().cpu().numpy()
+        depth = points[:, :, 2]
+        depth_img = (depth / depth.max()) * 255
         points = points.reshape(-1, 3)
         mask = out_label[0].permute([1, 2, 0]).detach().cpu().numpy()
         rgb_mask = mask.squeeze(2) + 1
         points_mask = mask.reshape(-1, 1) + 2
         points = np.concatenate([points, points_mask], axis=1)
 
-        wandb_img = wandb.Image(rgb_img, masks= {
-            "GT": {
-                "mask_data": rgb_mask
-            }
-        })
+        wandb_img = wandb.Image(rgb_img, masks={"GT": {"mask_data": rgb_mask}})
 
         features_img = feature_tensor_to_img(features)
+        features_rgb_img = feature_tensor_to_img(features_rgb)
+        features_depth_img = feature_tensor_to_img(features_depth)
 
         wandb.log(
             {
@@ -145,7 +152,10 @@ def validate_segnet(val_loader, network, epoch):
                 "val_inter_cluster_loss": inter_cluster_loss,
                 "epoch": epoch,
                 "val_image": wandb_img,
+                "val_depth_img": wandb.Image(depth_img),
                 "val_features": wandb.Image(features_img),
+                "val_features_rgb": wandb.Image(features_rgb_img),
+                "val_features_depth": wandb.Image(features_depth_img),
                 "val_point_cloud": wandb.Object3D(points),
             }
         )
@@ -164,8 +174,10 @@ def validate_segnet(val_loader, network, epoch):
             )
         )
 
+        torch.cuda.empty_cache()
 
-def train_segnet(train_loader, network, optimizer, epoch, val_loader=None):
+
+def train_segnet(train_loader, network, optimizer, epoch):
 
     batch_time = AverageMeter()
     epoch_size = len(train_loader)
@@ -185,9 +197,14 @@ def train_segnet(train_loader, network, optimizer, epoch, val_loader=None):
             depth = None
 
         label = sample["label"].cuda()
-        loss, intra_cluster_loss, inter_cluster_loss, features = network(
-            image, label, depth
-        )
+        (
+            loss,
+            intra_cluster_loss,
+            inter_cluster_loss,
+            features,
+            features_rgb,
+            features_depth,
+        ) = network(image, label, depth)
         loss = torch.sum(loss)
         intra_cluster_loss = torch.sum(intra_cluster_loss)
         inter_cluster_loss = torch.sum(inter_cluster_loss)
@@ -215,19 +232,19 @@ def train_segnet(train_loader, network, optimizer, epoch, val_loader=None):
             .numpy()
         )
         points = sample["depth"][0].permute([1, 2, 0]).detach().cpu().numpy()
+        depth = points[:, :, 2]
+        depth_img = (depth / depth.max()) * 255
         points = points.reshape(-1, 3)
         mask = sample["label"][0].permute([1, 2, 0]).detach().cpu().numpy()
         rgb_mask = mask.squeeze(2) + 1
         points_mask = mask.reshape(-1, 1) + 2
         points = np.concatenate([points, points_mask], axis=1)
 
-        wandb_img = wandb.Image(rgb_img, masks= {
-            "GT": {
-                "mask_data": rgb_mask
-            }
-        })
+        wandb_img = wandb.Image(rgb_img, masks={"GT": {"mask_data": rgb_mask}})
 
         features_img = feature_tensor_to_img(features)
+        features_rgb_img = feature_tensor_to_img(features_rgb)
+        features_depth_img = feature_tensor_to_img(features_depth)
 
         wandb.log(
             {
@@ -236,7 +253,10 @@ def train_segnet(train_loader, network, optimizer, epoch, val_loader=None):
                 "inter_cluster_loss": inter_cluster_loss,
                 "epoch": epoch,
                 "image": wandb_img,
+                "depth": wandb.Image(depth_img),
                 "features": wandb.Image(features_img),
+                "features_rgb": wandb.Image(features_rgb_img),
+                "features_depth": wandb.Image(features_depth_img),
                 "point_cloud": wandb.Object3D(points),
             }
         )
@@ -256,6 +276,3 @@ def train_segnet(train_loader, network, optimizer, epoch, val_loader=None):
             )
         )
         cfg.TRAIN.ITERS += 1
-
-    if val_loader is not None:
-        validate_segnet(val_loader, network, epoch)

@@ -24,13 +24,10 @@ import _init_paths
 import datasets
 import networks
 from fcn.config import cfg, cfg_from_file, get_output_dir
-from fcn.train import train_segnet
-from fcn.test_dataset import test_segnet
+from fcn.train import train_segnet, validate_segnet
 from datasets.factory import get_dataset
 
 import wandb
-
-wandb.init(project="UCN", entity="kln-ucn")
 
 
 def parse_args():
@@ -142,7 +139,7 @@ if __name__ == "__main__":
     worker_init_fn = (
         dataset.worker_init_fn if hasattr(dataset, "worker_init_fn") else None
     )
-    num_workers = 4
+    num_workers = 2
     dataloader = torch.utils.data.DataLoader(
         dataset,
         batch_size=cfg.TRAIN.IMS_PER_BATCH,
@@ -155,10 +152,10 @@ if __name__ == "__main__":
     val_worker_init_fn = (
         val_dataset.worker_init_fn if hasattr(val_dataset, "worker_init_fn") else None
     )
-    val_num_workers = 4
+    val_num_workers = 2
     val_dataloader = torch.utils.data.DataLoader(
         val_dataset,
-        batch_size=cfg.TRAIN.IMS_PER_BATCH,
+        batch_size=4,
         shuffle=True,
         num_workers=val_num_workers,
         worker_init_fn=val_worker_init_fn,
@@ -226,6 +223,8 @@ if __name__ == "__main__":
         )
     cfg.epochs = args.epochs
 
+    wandb.init(project="UCN", entity="kln-ucn")
+
     wandb.config = {
         "learning_rate": cfg.TRAIN.LEARNING_RATE,
         "momentum": cfg.TRAIN.MOMENTUM,
@@ -239,7 +238,9 @@ if __name__ == "__main__":
             scheduler.step()
 
         # train for one epoch
-        train_segnet(dataloader, network, optimizer, epoch, val_dataloader=val_dataloader)
+        train_segnet(dataloader, network, optimizer, epoch)
+        torch.cuda.empty_cache()
+        validate_segnet(val_dataloader, network, epoch)
 
         # save checkpoint
         if (epoch + 1) % cfg.TRAIN.SNAPSHOT_EPOCHS == 0 or epoch == args.epochs - 1:
