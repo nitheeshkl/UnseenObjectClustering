@@ -36,7 +36,7 @@ def parse_args():
     return args
 
 
-def visualize(rgb, depth, mask):
+def show_imgs(rgb, depth, mask):
     fig, axs = plt.subplots(nrows=1, ncols=3, figsize=(12, 3))
     axs[0].imshow(rgb)
     axs[0].set_title("RGB")
@@ -92,8 +92,12 @@ def generate(src, dst, split, visualize=False):
         depth_img = np.array(Image.open(src_depth_dir + "/{}.png".format(img_idx)))
         mask_img = np.array(Image.open(src_mask_dir + "/{}.png".format(img_idx)))
 
+        background = np.where(mask_img == 1)  # get background mask
+        depth_img[background] = 0  # remove background depth
+        mask_img[np.where(mask_img < 5)] = 0  # remove background and container labels
+
         if visualize:
-            visualize(rgb_img, depth_img, mask_img)
+            show_imgs(rgb_img, depth_img, mask_img)
         else:
             dst_file_indices.append(img_idx)
             Image.fromarray(rgb_img).save(dst_rgb_dir + "/{}.png".format(img_idx))

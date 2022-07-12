@@ -131,7 +131,7 @@ def _vis_minibatch_segmentation_final(image, depth, label, out_label=None, out_l
         im = im[:, :, (2, 1, 0)]
         im = np.clip(im, 0, 255)
         im = im.astype(np.uint8)
-        fig = plt.figure()
+        fig = plt.figure(figsize=[24,13])
         start = 1
         ax = fig.add_subplot(m, n, start)
         start += 1

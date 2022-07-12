@@ -12,7 +12,7 @@ from networks.utils import log_softmax_high_dimension, softmax_high_dimension
 from networks.embedding import EmbeddingLoss
 from . import unets
 from . import resnet_dilated
-
+        
 __all__ = [
     'seg_vgg_embedding', 'seg_unet_embedding', 'seg_resnet34_8s_embedding_early',
     'seg_resnet34_8s_embedding', 'seg_resnet50_8s_embedding',
@@ -96,22 +96,28 @@ class SEGNET(nn.Module):
         else:
             if self.input_type == 'DEPTH':
                 features = self.fcn(depth)
+                torch.save(features, "tmp/features_depth.pt")
             elif self.input_type == 'COLOR':
                 features = self.fcn(img)
+                torch.save(features, "tmp/features_color.pt")
             elif self.input_type == 'RGBD' and self.fusion_type == 'early':
                 inputs = torch.cat((img, depth), 1)
                 features = self.fcn(inputs)
             else:
                 features = self.fcn(img)
+                torch.save(features, "tmp/features_color.pt")
                 features_depth = self.fcn_depth(depth)
+                torch.save(features_depth, "tmp/features_depth.pt")
                 if self.fusion_type == 'add':
                     features = features + features_depth
                 else:
                     features = torch.cat((features, features_depth), 1)
+                torch.save(features, "tmp/features_fused.pt")
 
         # normalization
         if self.normalize:
             features = F.normalize(features, p=2, dim=1)
+            torch.save(features, "tmp/features_fused_normalized.pt")
         if self.training:
             loss, intra_cluster_loss, inter_cluster_loss = self.embedding_loss(features, label)
             return loss, intra_cluster_loss, inter_cluster_loss, features
