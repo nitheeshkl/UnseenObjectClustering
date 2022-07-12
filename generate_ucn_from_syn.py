@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 from PIL import Image
 from tqdm.auto import tqdm
 from multiprocessing import Pool, cpu_count
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -50,6 +51,18 @@ def show_imgs(rgb, depth, mask):
     plt.show()
     plt.close()
 
+def show_depth(depth):
+    print("depth min={}, max={}".format(depth.min(), depth.max()))
+    plt.close('all')
+    fig = plt.figure()
+    im = plt.imshow(depth, interpolation="none")
+
+    divider = make_axes_locatable(plt.gca())
+    cax = divider.append_axes('right', '5%', pad='3%')
+    plt.colorbar(im, cax=cax)
+    plt.tight_layout()
+    plt.show()
+    plt.close()
 
 class Generator:
     
@@ -90,20 +103,31 @@ class Generator:
         if not os.path.exists(self.dst_mask_dir):
             print("creating ", self.dst_mask_dir)
             os.makedirs(self.dst_mask_dir)
+        self.dst_depth_img_dir = os.path.join(self.dst, "depth_img")
+        if not os.path.exists(self.dst_depth_img_dir):
+            print("creating ", self.dst_depth_img_dir)
+            os.makedirs(self.dst_depth_img_dir)
 
     def process_file(self, rgb_file: str) -> None:
         img_idx = os.path.splitext(os.path.basename(rgb_file))[0]
         rgb_img = np.array(Image.open(rgb_file))
         mask_img = np.array(Image.open(self.src_mask_dir + "/{}.png".format(img_idx)))
-        depth = np.load(self.src_depth_dir + "/{}.npy".format(img_idx))
+        depth = np.load(self.src_depth_dir + "/partial_{}.npy".format(img_idx))
 
         background = np.where(mask_img == 1)  # get background mask
         depth[background] = 0  # remove background depth
+        depth[np.where(depth > 2000)] = 0
         mask_img[np.where(mask_img < 4)] = 0  # remove background and container labels
 
         Image.fromarray(rgb_img).save(self.dst_rgb_dir + "/{}.png".format(img_idx))
         np.save(self.dst_depth_dir + "/{}.npy".format(img_idx), depth)
         Image.fromarray(mask_img).save(self.dst_mask_dir + "/{}.png".format(img_idx))
+
+        plt.figure()
+        plt.tight_layout()
+        plt.imshow(depth)
+        plt.savefig(self.dst_depth_img_dir + "/{}.png".format(img_idx))
+        plt.close()
 
         return img_idx
 
@@ -117,13 +141,15 @@ class Generator:
                 img_idx = os.path.splitext(os.path.basename(rgb_file))[0]
                 rgb_img = np.array(Image.open(rgb_file))
                 mask_img = np.array(Image.open(self.src_mask_dir + "/{}.png".format(img_idx)))
-                depth = np.load(self.src_depth_dir + "/{}.npy".format(img_idx))
+                depth = np.load(self.src_depth_dir + "/partial_{}.npy".format(img_idx))
 
                 background = np.where(mask_img == 1)  # get background mask
                 depth[background] = 0  # remove background depth
+                depth[np.where(depth > 2000)] = 0
                 mask_img[np.where(mask_img < 4)] = 0  # remove background and container labels
 
-                show_imgs(rgb_img, depth, mask_img)
+                # show_imgs(rgb_img, depth, mask_img)
+                show_depth(depth)
 
                 pbar.set_description("{}".format(img_idx))
                 pbar.refresh()
