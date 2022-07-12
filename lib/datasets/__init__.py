@@ -4,8 +4,12 @@
 
 from .imdb import imdb
 from .tabletop_object import TableTopObject
-from .osd_object import OSDObject
-from .ocid_object import OCIDObject
+
+# from .osd_object import OSDObject
+# from .ocid_object import OCIDObject
+from .dopose_dataset import DoPoseDataset
+from .ucn_syn_dataset import UcnSynDataset
 
 import os.path as osp
-ROOT_DIR = osp.join(osp.dirname(__file__), '..', '..')
+ROOT_DIR = osp.join(osp.dirname(__file__), "..", "..")
+
