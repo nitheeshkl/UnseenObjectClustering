@@ -104,14 +104,14 @@ class SEGNET(nn.Module):
                 inputs = torch.cat((img, depth), 1)
                 features = self.fcn(inputs)
             else:
-                features = self.fcn(img)
+                features_rgb = self.fcn(img)
                 torch.save(features, "tmp/features_color.pt")
                 features_depth = self.fcn_depth(depth)
                 torch.save(features_depth, "tmp/features_depth.pt")
                 if self.fusion_type == 'add':
-                    features = features + features_depth
+                    features = features_rgb + features_depth
                 else:
-                    features = torch.cat((features, features_depth), 1)
+                    features = torch.cat((features_rgb, features_depth), 1)
                 torch.save(features, "tmp/features_fused.pt")
 
         # normalization
@@ -120,10 +120,10 @@ class SEGNET(nn.Module):
             torch.save(features, "tmp/features_fused_normalized.pt")
         if self.training:
             loss, intra_cluster_loss, inter_cluster_loss = self.embedding_loss(features, label)
-            return loss, intra_cluster_loss, inter_cluster_loss, features
+            return loss, intra_cluster_loss, inter_cluster_loss, features, features_rgb, features_depth
         else:
             loss, intra_cluster_loss, inter_cluster_loss = self.embedding_loss(features, label)
-            return loss, intra_cluster_loss, inter_cluster_loss, features
+            return loss, intra_cluster_loss, inter_cluster_loss, features, features_rgb, features_depth
             # return features
 
 
