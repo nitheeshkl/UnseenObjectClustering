@@ -256,20 +256,23 @@ def filter_labels(labels, bboxes):
 def test_sample(sample, network, network_crop, ind=None):
 
     # construct input
-    image = sample["image_color"].cuda()
+    # image = sample["image_color"].cuda()
+    image = sample["image_color"].cpu()
     if cfg.INPUT == "DEPTH" or cfg.INPUT == "RGBD":
-        depth = sample["depth"].cuda()
+        # depth = sample["depth"].cuda()
+        depth = sample["depth"].cpu()
     else:
         depth = None
 
     if "label" in sample:
-        label = sample["label"].cuda()
+        # label = sample["label"].cuda()
+        label = sample["label"].cpu()
     else:
         label = None
 
     st = time.time()
     # run network
-    features = network(image, label, depth).detach()
+    features = network(image, label, depth, idx=ind).detach()
     et_feat = time.time()
     out_label, selected_pixels = clustering_features(features, num_seeds=100)
     et_clust = time.time()
@@ -286,10 +289,13 @@ def test_sample(sample, network, network_crop, ind=None):
             image, out_label.clone(), depth
         )
         if rgb_crop.shape[0] > 0:
-            features_crop = network_crop(rgb_crop, out_label_crop, depth_crop)
+            features_crop = network_crop(rgb_crop, out_label_crop, depth_crop, idx=ind, crop=True)
             labels_crop, selected_pixels_crop = clustering_features(features_crop)
+            # out_label_refined, labels_crop = match_label_crop(
+            #     out_label, labels_crop.cuda(), out_label_crop, rois, depth_crop
+            # )
             out_label_refined, labels_crop = match_label_crop(
-                out_label, labels_crop.cuda(), out_label_crop, rois, depth_crop
+                out_label, labels_crop.cpu(), out_label_crop, rois, depth_crop
             )
 
     et_refine = time.time()
