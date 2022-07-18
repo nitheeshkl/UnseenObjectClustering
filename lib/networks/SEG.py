@@ -85,7 +85,7 @@ class SEGNET(nn.Module):
                 nn.init.constant_(m.bias, 0)
 
 
-    def forward(self, img, label, depth=None):
+    def forward(self, img, label, depth=None, idx=0, crop=False):
         if self.network_name == 'vgg':
             en = self.features(img)
         elif self.network_name == 'unet':
@@ -96,35 +96,35 @@ class SEGNET(nn.Module):
         else:
             if self.input_type == 'DEPTH':
                 features = self.fcn(depth)
-                torch.save(features, "tmp/features_depth.pt")
+                torch.save(features, "tmp/features/features_depth_{:06d}{}.pt".format(idx, "_crop" if crop else ''))
             elif self.input_type == 'COLOR':
                 features = self.fcn(img)
-                torch.save(features, "tmp/features_color.pt")
+                torch.save(features, "tmp/features/features_color_{:06d}{}.pt".format(idx, "_crop" if crop else ''))
             elif self.input_type == 'RGBD' and self.fusion_type == 'early':
                 inputs = torch.cat((img, depth), 1)
                 features = self.fcn(inputs)
             else:
                 features_rgb = self.fcn(img)
-                torch.save(features, "tmp/features_color.pt")
+                torch.save(features_rgb, "tmp/features/features_color_{:06d}{}.pt".format(idx, "_crop" if crop else ''))
                 features_depth = self.fcn_depth(depth)
-                torch.save(features_depth, "tmp/features_depth.pt")
+                torch.save(features_depth, "tmp/features/features_depth_{:06d}{}.pt".format(idx, "_crop" if crop else ''))
                 if self.fusion_type == 'add':
                     features = features_rgb + features_depth
                 else:
                     features = torch.cat((features_rgb, features_depth), 1)
-                torch.save(features, "tmp/features_fused.pt")
+                torch.save(features, "tmp/features/features_fused_{:06d}{}.pt".format(idx, "_crop" if crop else ''))
 
         # normalization
         if self.normalize:
             features = F.normalize(features, p=2, dim=1)
-            torch.save(features, "tmp/features_fused_normalized.pt")
+            torch.save(features, "tmp/features/features_fused_normalized_{:06d}{}.pt".format(idx, "_crop" if crop else ''))
         if self.training:
             loss, intra_cluster_loss, inter_cluster_loss = self.embedding_loss(features, label)
             return loss, intra_cluster_loss, inter_cluster_loss, features, features_rgb, features_depth
         else:
-            loss, intra_cluster_loss, inter_cluster_loss = self.embedding_loss(features, label)
-            return loss, intra_cluster_loss, inter_cluster_loss, features, features_rgb, features_depth
-            # return features
+            # loss, intra_cluster_loss, inter_cluster_loss = self.embedding_loss(features, label)
+            # return loss, intra_cluster_loss, inter_cluster_loss, features, features_rgb, features_depth
+            return features
 
 
     def weight_parameters(self):
