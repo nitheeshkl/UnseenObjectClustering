@@ -124,7 +124,7 @@ class SEGNET(nn.Module):
         else:
             # loss, intra_cluster_loss, inter_cluster_loss = self.embedding_loss(features, label)
             # return loss, intra_cluster_loss, inter_cluster_loss, features, features_rgb, features_depth
-            return features
+            return features, features_rgb, features_depth
 
 
     def weight_parameters(self):

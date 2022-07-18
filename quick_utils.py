@@ -6,6 +6,7 @@ import cv2
 import open3d as o3d
 import json
 import matplotlib.pyplot as plt
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 import torch
 
 def compute_xyz(depth, camera_params, scaled=False):
@@ -142,11 +143,12 @@ def feature_tensor_to_img(features):
     im_feature = im_feature.astype(np.uint8)
     return im_feature
 
-def visualize_feature_tensors_dir(dirpath):
-    features_list = sorted(glob.glob(os.path.join(dirpath, '*.pt')))
+def visualize_features_list(features_list, return_img=False):
     num_feats = len(features_list)
 
     fig, axs = plt.subplots(1,num_feats, figsize=[35,4])
+    canvas = FigureCanvas(fig)
+
 
     for i, f in enumerate(features_list):
         feature = torch.load(f)
@@ -155,7 +157,39 @@ def visualize_feature_tensors_dir(dirpath):
         axs[i].set_title(os.path.splitext(os.path.basename(f))[0])
 
     fig.tight_layout()
-    plt.show()
+    canvas.draw()
+    image = np.frombuffer(canvas.tostring_rgb(), dtype='uint8')
+
+    if return_img:
+        return image
+    else:
+        plt.show()
+        return None
+
+
+def visualize_feature_tensors_dir(dirpath, return_img = False):
+    features_list = sorted(glob.glob(os.path.join(dirpath, '*.pt')))
+    num_feats = len(features_list)
+
+    fig, axs = plt.subplots(1,num_feats, figsize=[35,4])
+    canvas = FigureCanvas(fig)
+
+
+    for i, f in enumerate(features_list):
+        feature = torch.load(f)
+        feature_img = feature_tensor_to_img(feature)
+        axs[i].imshow(feature_img)
+        axs[i].set_title(os.path.splitext(os.path.basename(f))[0])
+
+    fig.tight_layout()
+    canvas.draw()
+    image = np.frombuffer(canvas.tostring_rgb(), dtype='uint8')
+
+    if return_img:
+        return image
+    else:
+        plt.show()
+        return None
 
 
 def features_to_img(features):

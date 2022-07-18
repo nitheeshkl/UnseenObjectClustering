@@ -101,7 +101,7 @@ def _vis_features(features, labels, rgb, intial_labels, selected_pixels=None):
 
 
 def _vis_minibatch_segmentation_final(image, depth, label, out_label=None, out_label_refined=None,
-    features=None, ind=None, selected_pixels=None, bbox=None):
+    features=None, ind=None, selected_pixels=None, bbox=None, features_rgb=None, features_depth=None, features_crop=None):
 
     if depth is None:
         im_blob = image.cpu().numpy()
@@ -120,7 +120,7 @@ def _vis_minibatch_segmentation_final(image, depth, label, out_label=None, out_l
     if out_label_refined is not None:
         out_label_refined_blob = out_label_refined.cpu().numpy()
 
-    m = 2
+    m = 3
     n = 3
     for i in range(num):
 
@@ -131,7 +131,7 @@ def _vis_minibatch_segmentation_final(image, depth, label, out_label=None, out_l
         im = im[:, :, (2, 1, 0)]
         im = np.clip(im, 0, 255)
         im = im.astype(np.uint8)
-        fig = plt.figure(figsize=[24,13])
+        fig = plt.figure(figsize=[24,24])
         start = 1
         ax = fig.add_subplot(m, n, start)
         start += 1
@@ -160,6 +160,48 @@ def _vis_minibatch_segmentation_final(image, depth, label, out_label=None, out_l
             start += 1
             plt.imshow(im_feature)
             ax.set_title('feature map')
+            plt.axis('off')
+
+        # feature_rgb
+        if features_rgb is not None:
+            im_feature = torch.cuda.FloatTensor(height, width, 3)
+            for j in range(3):
+                im_feature[:, :, j] = torch.sum(features_rgb[i, j::3, :, :], dim=0)
+            im_feature = normalize_descriptor(im_feature.detach().cpu().numpy())
+            im_feature *= 255
+            im_feature = im_feature.astype(np.uint8)
+            ax = fig.add_subplot(m, n, start)
+            start += 1
+            plt.imshow(im_feature)
+            ax.set_title('feature_rgb map')
+            plt.axis('off')
+
+        # feature_depth
+        if features is not None:
+            im_feature = torch.cuda.FloatTensor(height, width, 3)
+            for j in range(3):
+                im_feature[:, :, j] = torch.sum(features_depth[i, j::3, :, :], dim=0)
+            im_feature = normalize_descriptor(im_feature.detach().cpu().numpy())
+            im_feature *= 255
+            im_feature = im_feature.astype(np.uint8)
+            ax = fig.add_subplot(m, n, start)
+            start += 1
+            plt.imshow(im_feature)
+            ax.set_title('feature_depth map')
+            plt.axis('off')
+
+        # feature_crop
+        if features is not None:
+            im_feature = torch.cuda.FloatTensor(height, width, 3)
+            for j in range(3):
+                im_feature[:, :, j] = torch.sum(features_crop[i, j::3, :, :], dim=0)
+            im_feature = normalize_descriptor(im_feature.detach().cpu().numpy())
+            im_feature *= 255
+            im_feature = im_feature.astype(np.uint8)
+            ax = fig.add_subplot(m, n, start)
+            start += 1
+            plt.imshow(im_feature)
+            ax.set_title('feature_crop map')
             plt.axis('off')
 
         # initial seeds
