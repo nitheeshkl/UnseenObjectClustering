@@ -188,11 +188,15 @@ def read_sample(filename_color, filename_depth, camera_params):
         xyz_img = None
 
     # crop roi
-    c1,c2,r1,r2 = 325, 1919, 60, 1199
-    # c1,c2,r1,r2 = 425, 1919, 150, 1179
-    im = im[r1:r2,c1:c2]
+    # c1,c2,r1,r2 = 325, 1919, 60, 1199
+    c1,c2,r1,r2 = 425, 1919, 150, 1179
+    fg_mask = np.zeros(im.shape)
+    fg_mask[r1:r2, c1:c2] = [1, 1, 1]
+    # im = im[r1:r2,c1:c2]
+    im = (im * fg_mask).astype(np.uint8)
     if xyz_img is not None:
-        xyz_img = xyz_img[r1:r2,c1:c2]
+        # xyz_img = xyz_img[r1:r2,c1:c2]
+        xyz_img = (xyz_img * fg_mask).astype(np.float32)
         r,c = np.where(xyz_img[:,:,2] > 1.2)
         xyz_img[r,c] = [0., 0., 0.]
 
