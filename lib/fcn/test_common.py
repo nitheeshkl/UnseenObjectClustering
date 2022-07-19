@@ -177,7 +177,7 @@ def _vis_minibatch_segmentation_final(image, depth, label, out_label=None, out_l
             plt.axis('off')
 
         # feature_depth
-        if features is not None:
+        if features_depth is not None:
             im_feature = torch.cuda.FloatTensor(height, width, 3)
             for j in range(3):
                 im_feature[:, :, j] = torch.sum(features_depth[i, j::3, :, :], dim=0)
@@ -190,19 +190,20 @@ def _vis_minibatch_segmentation_final(image, depth, label, out_label=None, out_l
             ax.set_title('feature_depth map')
             plt.axis('off')
 
-        # feature_crop
-        if features is not None:
-            im_feature = torch.cuda.FloatTensor(height, width, 3)
-            for j in range(3):
-                im_feature[:, :, j] = torch.sum(features_crop[i, j::3, :, :], dim=0)
-            im_feature = normalize_descriptor(im_feature.detach().cpu().numpy())
-            im_feature *= 255
-            im_feature = im_feature.astype(np.uint8)
-            ax = fig.add_subplot(m, n, start)
-            start += 1
-            plt.imshow(im_feature)
-            ax.set_title('feature_crop map')
-            plt.axis('off')
+        # # feature_crop
+        # if features_crop is not None:
+        #     h_crop, w_crop = features_crop.shape[-2:]
+        #     im_feature = torch.cuda.FloatTensor(h_crop, w_crop, 3)
+        #     for j in range(3):
+        #         im_feature[:, :, j] = torch.sum(features_crop[i, j::3, :, :], dim=0)
+        #     im_feature = normalize_descriptor(im_feature.detach().cpu().numpy())
+        #     im_feature *= 255
+        #     im_feature = im_feature.astype(np.uint8)
+        #     ax = fig.add_subplot(m, n, start)
+        #     start += 1
+        #     plt.imshow(im_feature)
+        #     ax.set_title('feature_crop map')
+        #     plt.axis('off')
 
         # initial seeds
         if selected_pixels is not None:
@@ -251,6 +252,7 @@ def _vis_minibatch_segmentation_final(image, depth, label, out_label=None, out_l
             # mng.resize(*mng.window.maxsize())
             # plt.pause(0.001)
             # plt.show(block=False)
+            plt.tight_layout()
             filename = 'output/images/%06d.png' % ind
             fig.savefig(filename)
             plt.close()

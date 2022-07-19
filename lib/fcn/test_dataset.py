@@ -269,7 +269,12 @@ def test_sample(sample, network, network_crop, ind=None):
 
     st = time.time()
     # run network
-    features, features_rgb, features_depth = network(image, label, depth).detach()
+    features, features_rgb, features_depth = network(image, label, depth)
+    features, features_rgb, features_depth = (
+        features.detach(),
+        features_rgb.detach(),
+        features_depth.detach(),
+    )
     et_feat = time.time()
     out_label, selected_pixels = clustering_features(features, num_seeds=100)
     et_clust = time.time()
@@ -281,6 +286,7 @@ def test_sample(sample, network, network_crop, ind=None):
 
     # zoom in refinement
     out_label_refined = None
+    features_crop = None
     if network_crop is not None:
         rgb_crop, out_label_crop, rois, depth_crop = crop_rois(
             image, out_label.clone(), depth
@@ -316,7 +322,7 @@ def test_sample(sample, network, network_crop, ind=None):
             ind=ind,
             features_rgb=features_rgb,
             features_depth=features_depth,
-            features_crop=features_crop if network_crop is not None else None,
+            features_crop=None if network_crop is None else features_crop,
         )
     return out_label, out_label_refined
 
