@@ -130,26 +130,29 @@ class UcnSynDataset(data.Dataset, datasets.imdb):
         # depth image
         if cfg.INPUT == "DEPTH" or cfg.INPUT == "RGBD":
             # depth_img = np.asarray(imageio.imread(depth_file))
-            depth_img = np.load(depth_file)
-            xyz_img = self.process_depth(depth_img)
+            # depth_img = np.load(depth_file)
+            # xyz_img = self.process_depth(depth_img)
+            xyz_img = np.load(depth_file)
+            if self.params["use_data_augmentation"]:
+                xyz_img = augmentation.add_noise_to_xyz(xyz_img, xyz_img[:,:,2], self.params)
         else:
             xyz_img = None
 
         if cfg.TRAIN.SYN_CROP:
             rgb_img, xyz_img, label = self.pad_crop_resize(rgb_img, xyz_img, label)
             # FIXME: check if remap_label() is needed after SYN_CROP
-            # label = self.remap_label(label)
-        else:
-            scale_percent = 40  # percent of original size
-            width = int(rgb_img.shape[1] * scale_percent / 100)
-            height = int(rgb_img.shape[0] * scale_percent / 100)
-            dim = (width, height)
+            label = self.remap_label(label)
+        # else:
+        #     scale_percent = 40  # percent of original size
+        #     width = int(rgb_img.shape[1] * scale_percent / 100)
+        #     height = int(rgb_img.shape[0] * scale_percent / 100)
+        #     dim = (width, height)
 
-            rgb_img = cv2.resize(rgb_img, dim)
-            label = cv2.resize(label.astype(np.uint8), dim, interpolation=cv2.INTER_NEAREST)
-            if cfg.INPUT == "DEPTH" or cfg.INPUT == "RGBD":
-                depth_img = cv2.resize(depth_img, dim, interpolation=cv2.INTER_NEAREST)
-                xyz_img = self.process_depth(depth_img)
+        #     rgb_img = cv2.resize(rgb_img, dim)
+        #     label = cv2.resize(label.astype(np.uint8), dim, interpolation=cv2.INTER_NEAREST)
+        #     if cfg.INPUT == "DEPTH" or cfg.INPUT == "RGBD":
+        #         depth_img = cv2.resize(depth_img, dim, interpolation=cv2.INTER_NEAREST)
+        #         xyz_img = self.process_depth(depth_img)
 
         # sample label pixels
         if cfg.TRAIN.EMBEDDING_SAMPLING:
