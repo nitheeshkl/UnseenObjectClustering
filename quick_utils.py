@@ -43,7 +43,7 @@ def compute_xyz(depth, camera_params, scaled=False):
 
     return xyz_img
 
-def visualize_xyz(xyz):
+def visualize_xyz(xyz, origin=[0.,0.,0.]):
     # convert [H,W,3] to [N,3] required by o3d
     # x = xyz[:,:,0].flatten()
     # y = xyz[:,:,1].flatten()
@@ -53,7 +53,7 @@ def visualize_xyz(xyz):
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(points)
 
-    coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.2, origin=[0.,0.,0.])
+    coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.2, origin=origin)
     geometries = list([pcd, coordinate_frame])
     
     o3d.visualization.draw_geometries(geometries)
