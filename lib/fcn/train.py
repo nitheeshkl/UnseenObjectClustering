@@ -89,6 +89,8 @@ def validate_segnet(val_loader, network, epoch):
 
     batch_time = AverageMeter()
     epoch_size = len(val_loader)
+    avg_loss = AverageMeter()
+    start_step = epoch_size * epoch
 
     # switch to test mode
     network.eval()
@@ -122,6 +124,8 @@ def validate_segnet(val_loader, network, epoch):
         # measure elapsed time
         batch_time.update(time.time() - end)
 
+        avg_loss.update(loss)
+
         pixel_mean = torch.tensor(cfg.PIXEL_MEANS / 255.0).float()
 
         rgb_img = (
@@ -150,7 +154,7 @@ def validate_segnet(val_loader, network, epoch):
                 "val_loss": loss,
                 "val_intra_cluster_loss": intra_cluster_loss,
                 "val_inter_cluster_loss": inter_cluster_loss,
-                "epoch": epoch,
+                "step_idx": start_step + i,
                 "val_image": wandb_img,
                 "val_depth_img": wandb.Image(depth_img),
                 "val_features": wandb.Image(features_img),
@@ -176,11 +180,20 @@ def validate_segnet(val_loader, network, epoch):
 
         torch.cuda.empty_cache()
 
+    wandb.log(
+        {
+            "val_avg_loss": avg_loss.val,
+            "epoch": epoch
+        }
+    )
+
 
 def train_segnet(train_loader, network, optimizer, epoch):
 
     batch_time = AverageMeter()
     epoch_size = len(train_loader)
+    avg_loss = AverageMeter()
+    start_step = epoch_size * epoch
 
     # switch to train mode
     network.train()
@@ -223,6 +236,8 @@ def train_segnet(train_loader, network, optimizer, epoch):
         # measure elapsed time
         batch_time.update(time.time() - end)
 
+        avg_loss.update(loss)
+
         pixel_mean = torch.tensor(cfg.PIXEL_MEANS / 255.0).float()
 
         rgb_img = (
@@ -251,7 +266,7 @@ def train_segnet(train_loader, network, optimizer, epoch):
                 "train_loss": loss,
                 "intra_cluster_loss": intra_cluster_loss,
                 "inter_cluster_loss": inter_cluster_loss,
-                "epoch": epoch,
+                "step_idx": start_step + i,
                 "image": wandb_img,
                 "depth": wandb.Image(depth_img),
                 "features": wandb.Image(features_img),
@@ -276,3 +291,10 @@ def train_segnet(train_loader, network, optimizer, epoch):
             )
         )
         cfg.TRAIN.ITERS += 1
+
+    wandb.log(
+        {
+            "train_avg_loss": avg_loss.val,
+            "epoch": epoch
+        }
+    )
