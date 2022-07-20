@@ -7,12 +7,15 @@ import os
 import argparse
 import glob
 import shutil
+import json
 import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
 from tqdm.auto import tqdm
 from multiprocessing import Pool, cpu_count
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+import open3d as o3d
+import cv2
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -76,6 +79,7 @@ class Generator:
         self.dst = dst
         self.split = split
         self.visualize = visualize
+        self.downscale = True # resize data to 640x480
 
 
         print("loading source dataset from ", self.src)
@@ -83,6 +87,7 @@ class Generator:
         self.src_rgb_dir = os.path.join(self.src, "rgb")
         self.src_depth_dir = os.path.join(self.src, "depth")
         self.src_mask_dir = os.path.join(self.src, "mask")
+        self.src_cam_pose_dir = os.path.join(self.src, "cam_pose")
 
         print("reading rgb files...")
         self.rgb_imgs = sorted(glob.glob(os.path.join(self.src_rgb_dir, "*.png")))
@@ -108,24 +113,122 @@ class Generator:
             print("creating ", self.dst_depth_img_dir)
             os.makedirs(self.dst_depth_img_dir)
 
+    def compute_xyz(self, depth, camera_params, scaled=False):
+        height = depth.shape[0]
+        width = depth.shape[1]
+        img_height = camera_params['height']
+        img_width = camera_params['width']
+        fx = camera_params['fx']
+        fy = camera_params['fy']
+        if "x_offset" in camera_params.keys():
+            px = camera_params['x_offset']
+            py = camera_params['y_offset']
+        else:
+            px = camera_params['cx']
+            py = camera_params['cy']
+
+        indices =  np.indices((height, width), dtype=np.float32).transpose(1,2,0) #[H,W,2]
+
+        if scaled:
+            scale_x = width / img_width
+            scale_y = height / img_height
+        else:
+            scale_x, scale_y = 1., 1.
+
+        # print("scale = ({},{})".format(scale_x, scale_y))
+
+        fx, fy = fx * scale_x, fy * scale_y
+        px, py = px * scale_x, py * scale_y
+
+        z = depth
+        x = (indices[..., 1] - px) * z / fx
+        y = (indices[..., 0] - py) * z / fy
+        xyz_img = np.stack([x,y,z], axis=-1) # [H,W,3]
+
+        return xyz_img
+
+    def __get_color(self, img_idx: str) -> np.ndarray:
+        rgb_img = np.array(Image.open(self.src_rgb_dir +"/{}.png".format(img_idx)))
+
+        if self.downscale:
+            rgb_img = cv2.resize(rgb_img[120:,:,:], (640, 480))
+
+        return rgb_img
+
+    def __get_mask(self, img_idx: str) -> np.ndarray:
+        mask_img = np.array(Image.open(self.src_mask_dir + "/{}.png".format(img_idx)))
+
+        if self.downscale:
+            mask_img = cv2.resize(mask_img[120:,:], (640, 480), interpolation=cv2.INTER_NEAREST)
+
+        return mask_img
+
+    def __get_points(self, img_idx:str ) -> np.ndarray:
+
+        depth = np.load(self.src_depth_dir + "/{}.npy".format(img_idx))
+        depth = depth / 1000. # mm to m
+        cam_pose = np.load(self.src_cam_pose_dir + "/{}.npy".format(img_idx))
+        cam_params = None
+        with open(self.src + "/camera.json") as f:
+            cam_params = json.load(f)
+
+        cam_loc = cam_pose[:3, 3]
+
+        H, W = depth.shape
+
+        # create o3d point cloud structure
+        structured_points = self.compute_xyz(depth, cam_params)
+        points = structured_points.reshape(-1,3)
+        pcd = o3d.geometry.PointCloud()
+        pcd.points = o3d.utility.Vector3dVector(points)
+
+        # compute normals
+        pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.01, max_nn=15))
+        norm_pcd = pcd.normalize_normals()
+        normals = np.asarray(norm_pcd.normals).reshape(H, W, 3)
+
+        # remove planes that are close to parallel to camera view
+        t = -cam_loc
+        unit_vec = t / np.linalg.norm(t)
+        dot_prod = np.abs(np.dot(normals, unit_vec))
+        mask = (dot_prod > np.cos(np.radians(75))).astype(float)
+
+        result = (structured_points * mask.reshape(H,W,1)).astype(structured_points.dtype)
+
+        if self.downscale:
+            result = cv2.resize(result, (640, 480), interpolation=cv2.INTER_NEAREST)
+
+        return result
+
+    def __get_data(self, img_idx: str) -> tuple:
+        rgb_img = self.__get_color(img_idx)
+        mask_img = self.__get_mask(img_idx)
+        points = self.__get_points(img_idx)
+
+        H, W = mask_img.shape
+        fg_mask = (mask_img!=1).astype(float).reshape(H,W,1) # create foreground mask including container
+
+        # filter background from rgb and depth
+        rgb_img = (rgb_img * fg_mask).astype(rgb_img.dtype)
+        points = (points * fg_mask).astype(points.dtype)
+        points[np.where(points[:,:,2] > 2.)] = [0, 0, 0]
+        # remove background and container from label mask
+        mask_img[np.where(mask_img < 4)] = 0
+
+        return rgb_img, mask_img, points
+
     def process_file(self, rgb_file: str) -> None:
         img_idx = os.path.splitext(os.path.basename(rgb_file))[0]
-        rgb_img = np.array(Image.open(rgb_file))
-        mask_img = np.array(Image.open(self.src_mask_dir + "/{}.png".format(img_idx)))
-        depth = np.load(self.src_depth_dir + "/partial_{}.npy".format(img_idx))
 
-        background = np.where(mask_img == 1)  # get background mask
-        depth[background] = 0  # remove background depth
-        depth[np.where(depth > 2000)] = 0
-        mask_img[np.where(mask_img < 4)] = 0  # remove background and container labels
+        rgb_img, mask_img, points = self.__get_data(img_idx)
 
         Image.fromarray(rgb_img).save(self.dst_rgb_dir + "/{}.png".format(img_idx))
-        np.save(self.dst_depth_dir + "/{}.npy".format(img_idx), depth)
+        np.save(self.dst_depth_dir + "/{}.npy".format(img_idx), points)
         Image.fromarray(mask_img).save(self.dst_mask_dir + "/{}.png".format(img_idx))
 
         plt.figure()
         plt.tight_layout()
-        plt.imshow(depth)
+        plt.imshow(points[:,:,2])
         plt.savefig(self.dst_depth_img_dir + "/{}.png".format(img_idx))
         plt.close()
 
@@ -139,24 +242,20 @@ class Generator:
             pbar = tqdm(self.rgb_imgs)
             for rgb_file in pbar:
                 img_idx = os.path.splitext(os.path.basename(rgb_file))[0]
-                rgb_img = np.array(Image.open(rgb_file))
-                mask_img = np.array(Image.open(self.src_mask_dir + "/{}.png".format(img_idx)))
-                depth = np.load(self.src_depth_dir + "/partial_{}.npy".format(img_idx))
 
-                background = np.where(mask_img == 1)  # get background mask
-                depth[background] = 0  # remove background depth
-                depth[np.where(depth > 2000)] = 0
-                mask_img[np.where(mask_img < 4)] = 0  # remove background and container labels
+                rgb_img, mask_img, points = self.__get_data(img_idx)
 
-                # show_imgs(rgb_img, depth, mask_img)
-                show_depth(depth)
+                show_imgs(rgb_img, points[:,:,2], mask_img)
+                # show_depth(partial_depth)
 
                 pbar.set_description("{}".format(img_idx))
                 pbar.refresh()
         else:
 
             dst_file_indices = []
-            with Pool(processes=cpu_count()) as pool:
+            # num_cpus = cpu_count()
+            num_cpus = 8
+            with Pool(processes=num_cpus) as pool:
                 for idx in tqdm(pool.imap(self.process_file, self.rgb_imgs), total=len(self.rgb_imgs)):
                     dst_file_indices.append(idx)
 
