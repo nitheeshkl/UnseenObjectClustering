@@ -215,8 +215,8 @@ def train_segnet(train_loader, network, optimizer, epoch):
             intra_cluster_loss,
             inter_cluster_loss,
             features,
-            features_rgb,
-            features_depth,
+            # features_rgb,
+            # features_depth,
         ) = network(image, label, depth)
         loss = torch.sum(loss)
         intra_cluster_loss = torch.sum(intra_cluster_loss)
@@ -258,8 +258,8 @@ def train_segnet(train_loader, network, optimizer, epoch):
         wandb_img = wandb.Image(rgb_img, masks={"GT": {"mask_data": rgb_mask}})
 
         features_img = feature_tensor_to_img(features)
-        features_rgb_img = feature_tensor_to_img(features_rgb)
-        features_depth_img = feature_tensor_to_img(features_depth)
+        # features_rgb_img = feature_tensor_to_img(features_rgb)
+        # features_depth_img = feature_tensor_to_img(features_depth)
 
         wandb.log(
             {
@@ -267,14 +267,20 @@ def train_segnet(train_loader, network, optimizer, epoch):
                 "intra_cluster_loss": intra_cluster_loss,
                 "inter_cluster_loss": inter_cluster_loss,
                 "step_idx": start_step + i,
-                "image": wandb_img,
-                "depth": wandb.Image(depth_img),
-                "features": wandb.Image(features_img),
-                "features_rgb": wandb.Image(features_rgb_img),
-                "features_depth": wandb.Image(features_depth_img),
-                "point_cloud": wandb.Object3D(points),
             }
         )
+
+        if (start_step + i) % 100 == 0:
+            wandb.log(
+                {
+                    "image": wandb_img,
+                    "depth": wandb.Image(depth_img),
+                    "features": wandb.Image(features_img),
+                    # "features_rgb": wandb.Image(features_rgb_img),
+                    # "features_depth": wandb.Image(features_depth_img),
+                    "point_cloud": wandb.Object3D(points),
+                }
+            )
 
         print(
             "[%d/%d][%d/%d], loss %.4f, loss intra: %.4f, loss_inter %.4f, lr %.6f, time %.2f"
