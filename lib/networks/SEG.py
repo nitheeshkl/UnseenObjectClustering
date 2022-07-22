@@ -96,7 +96,7 @@ class SEGNET(nn.Module):
         else:
             if self.input_type == 'DEPTH':
                 features = self.fcn(depth)
-                torch.save(features, "tmp/features/features_depth_{:06d}{}.pt".format(idx, "_crop" if crop else ''))
+                # torch.save(features, "tmp/features/features_depth_{:06d}{}.pt".format(idx, "_crop" if crop else ''))
             elif self.input_type == 'COLOR':
                 features = self.fcn(img)
                 torch.save(features, "tmp/features/features_color_{:06d}{}.pt".format(idx, "_crop" if crop else ''))
@@ -117,14 +117,16 @@ class SEGNET(nn.Module):
         # normalization
         if self.normalize:
             features = F.normalize(features, p=2, dim=1)
-            torch.save(features, "tmp/features/features_fused_normalized_{:06d}{}.pt".format(idx, "_crop" if crop else ''))
+            # torch.save(features, "tmp/features/features_fused_normalized_{:06d}{}.pt".format(idx, "_crop" if crop else ''))
         if self.training:
             loss, intra_cluster_loss, inter_cluster_loss = self.embedding_loss(features, label)
-            return loss, intra_cluster_loss, inter_cluster_loss, features, features_rgb, features_depth
+            return loss, intra_cluster_loss, inter_cluster_loss, features
+            # return loss, intra_cluster_loss, inter_cluster_loss, features, features_rgb, features_depth
         else:
             # loss, intra_cluster_loss, inter_cluster_loss = self.embedding_loss(features, label)
             # return loss, intra_cluster_loss, inter_cluster_loss, features, features_rgb, features_depth
-            return features, features_rgb, features_depth
+            # return features, features_rgb, features_depth
+            return features
 
 
     def weight_parameters(self):
