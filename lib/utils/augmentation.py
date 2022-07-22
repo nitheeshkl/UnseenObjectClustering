@@ -125,6 +125,42 @@ def dropout_random_ellipses(depth_img, noise_params):
 
     return depth_img
 
+def dropout_random_ellipses_xyz(points, noise_params):
+    """ Randomly drop a few ellipses in the image for robustness.
+        This is adapted from the DexNet 2.0 codebase.
+        Their code: https://github.com/BerkeleyAutomation/gqcnn/blob/75040b552f6f7fb264c27d427b404756729b5e88/gqcnn/sgd_optimizer.py
+
+        @param depth_img: a [H x W] set of depth z values
+    """
+    points = points.copy()
+    depth_img = points[:,:,2]
+
+    # Sample number of ellipses to dropout
+    num_ellipses_to_dropout = np.random.poisson(noise_params['ellipse_dropout_mean'])
+
+    # Sample ellipse centers
+    nonzero_pixel_indices = np.array(np.where(depth_img > 0)).T # Shape: [#nonzero_pixels x 2]
+    dropout_centers_indices = np.random.choice(nonzero_pixel_indices.shape[0], size=num_ellipses_to_dropout)
+    dropout_centers = nonzero_pixel_indices[dropout_centers_indices, :] # Shape: [num_ellipses_to_dropout x 2]
+
+    # Sample ellipse radii and angles
+    x_radii = np.random.gamma(noise_params['ellipse_gamma_shape'], noise_params['ellipse_gamma_scale'], size=num_ellipses_to_dropout)
+    y_radii = np.random.gamma(noise_params['ellipse_gamma_shape'], noise_params['ellipse_gamma_scale'], size=num_ellipses_to_dropout)
+    angles = np.random.randint(0, 360, size=num_ellipses_to_dropout)
+
+    # Dropout ellipses
+    for i in range(num_ellipses_to_dropout):
+        center = dropout_centers[i, :]
+        x_radius = np.round(x_radii[i]).astype(int)
+        y_radius = np.round(y_radii[i]).astype(int)
+        angle = angles[i]
+
+        # dropout the ellipse
+        mask = np.zeros_like(depth_img)
+        mask = cv2.ellipse(mask, tuple(center[::-1]), (x_radius, y_radius), angle=angle, startAngle=0, endAngle=360, color=1, thickness=-1)
+        points[mask == 1] = [0,0,0]
+
+    return points
 
 ##### RGB Augmentations #####
 

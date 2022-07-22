@@ -25,7 +25,7 @@ data_loading_params = {
     "gamma_shape": 1000.0,
     "gamma_scale": 0.001,
     # Additive noise
-    "gaussian_scale": 0.005,  # 5mm standard dev
+    "gaussian_scale": 0.001,  # 5mm standard dev
     "gp_rescale_factor": 4,
     # Random ellipse dropout
     "ellipse_dropout_mean": 10,
@@ -135,6 +135,7 @@ class UcnSynDataset(data.Dataset, datasets.imdb):
             xyz_img = np.load(depth_file)
             if self.params["use_data_augmentation"]:
                 xyz_img = augmentation.add_noise_to_xyz(xyz_img, xyz_img[:,:,2], self.params)
+                xyz_img = augmentation.dropout_random_ellipses_xyz(xyz_img, self.params)
         else:
             xyz_img = None
 
