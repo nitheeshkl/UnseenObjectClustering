@@ -222,6 +222,7 @@ def train_segnet(train_loader, network, optimizer, epoch):
         intra_cluster_loss = torch.sum(intra_cluster_loss)
         inter_cluster_loss = torch.sum(inter_cluster_loss)
         out_label = None
+        out_label, selected_pixels = clustering_features(features, num_seeds=100)
 
         if cfg.TRAIN.VISUALIZE:
             _vis_minibatch_segmentation(
@@ -254,6 +255,7 @@ def train_segnet(train_loader, network, optimizer, epoch):
         rgb_mask = mask.squeeze(2) + 1
         points_mask = mask.reshape(-1, 1) + 2
         points = np.concatenate([points, points_mask], axis=1)
+        pred_mask = out_label[0].permute([1, 2, 0]).detach().cpu().numpy()
 
         wandb_img = wandb.Image(rgb_img, masks={"GT": {"mask_data": rgb_mask}})
 

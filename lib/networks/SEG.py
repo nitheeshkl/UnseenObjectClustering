@@ -120,13 +120,13 @@ class SEGNET(nn.Module):
             # torch.save(features, "tmp/features/features_fused_normalized_{:06d}{}.pt".format(idx, "_crop" if crop else ''))
         if self.training:
             loss, intra_cluster_loss, inter_cluster_loss = self.embedding_loss(features, label)
-            return loss, intra_cluster_loss, inter_cluster_loss, features
-            # return loss, intra_cluster_loss, inter_cluster_loss, features, features_rgb, features_depth
+            # return loss, intra_cluster_loss, inter_cluster_loss, features
+            return loss, intra_cluster_loss, inter_cluster_loss, features, features_rgb, features_depth
         else:
             # loss, intra_cluster_loss, inter_cluster_loss = self.embedding_loss(features, label)
             # return loss, intra_cluster_loss, inter_cluster_loss, features, features_rgb, features_depth
-            # return features, features_rgb, features_depth
-            return features
+            return features, features_rgb, features_depth
+            # return features
 
 
     def weight_parameters(self):

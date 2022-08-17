@@ -274,6 +274,8 @@ def test_sample(sample, network, network_crop, ind=None):
     # run network
     features, features_rgb, features_depth = network(image, label, depth)
     features, features_rgb, features_depth = features.detach(), features_rgb.detach(), features_depth.detach()
+    # features = network(image, label, depth)
+    # features, features_rgb, features_depth = features.detach(), None, None 
     et_feat = time.time()
     out_label, selected_pixels = clustering_features(features, num_seeds=100)
     et_clust = time.time()
@@ -292,6 +294,7 @@ def test_sample(sample, network, network_crop, ind=None):
         )
         if rgb_crop.shape[0] > 0:
             features_crop, features_crop_rgb, features_crop_depth = network_crop(rgb_crop, out_label_crop, depth_crop)
+            # features_crop, features_crop_rgb, features_crop_depth = network_crop(rgb_crop, out_label_crop, depth_crop), None, None
             labels_crop, selected_pixels_crop = clustering_features(features_crop)
             # out_label_refined, labels_crop = match_label_crop(
             #     out_label, labels_crop.cuda(), out_label_crop, rois, depth_crop

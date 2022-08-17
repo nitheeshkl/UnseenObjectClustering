@@ -151,7 +151,7 @@ class Generator:
         rgb_img = np.array(Image.open(self.src_rgb_dir +"/{}.png".format(img_idx)))
 
         if self.downscale:
-            rgb_img = cv2.resize(rgb_img[120:,:,:], (640, 480))
+            rgb_img = cv2.resize(rgb_img, (640, 480))
 
         return rgb_img
 
@@ -159,7 +159,7 @@ class Generator:
         mask_img = np.array(Image.open(self.src_mask_dir + "/{}.png".format(img_idx)))
 
         if self.downscale:
-            mask_img = cv2.resize(mask_img[120:,:], (640, 480), interpolation=cv2.INTER_NEAREST)
+            mask_img = cv2.resize(mask_img, (640, 480), interpolation=cv2.INTER_NEAREST)
 
         return mask_img
 
@@ -206,10 +206,10 @@ class Generator:
         points = self.__get_points(img_idx)
 
         H, W = mask_img.shape
-        fg_mask = (mask_img!=1).astype(float).reshape(H,W,1) # create foreground mask including container
+        fg_mask = (mask_img > 3).astype(float).reshape(H,W,1) # create foreground mask including container
 
         # filter background from rgb and depth
-        rgb_img = (rgb_img * fg_mask).astype(rgb_img.dtype)
+        # rgb_img = (rgb_img * fg_mask).astype(rgb_img.dtype)
         points = (points * fg_mask).astype(points.dtype)
         points[np.where(points[:,:,2] > 2.)] = [0, 0, 0]
         # remove background and container from label mask

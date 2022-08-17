@@ -189,7 +189,8 @@ def read_sample(filename_color, filename_depth, camera_params):
 
     # crop roi
     # c1,c2,r1,r2 = 325, 1919, 60, 1199
-    c1,c2,r1,r2 = 425, 1919, 150, 1179
+    # c1,c2,r1,r2 = 425, 1919, 150, 1179
+    c1,c2,r1,r2 = 545, 1710, 250, 1060
     fg_mask = np.zeros(im.shape)
     fg_mask[r1:r2, c1:c2] = [1, 1, 1]
     # im = im[r1:r2,c1:c2]
@@ -197,7 +198,8 @@ def read_sample(filename_color, filename_depth, camera_params):
     if xyz_img is not None:
         # xyz_img = xyz_img[r1:r2,c1:c2]
         xyz_img = (xyz_img * fg_mask).astype(np.float32)
-        r,c = np.where(xyz_img[:,:,2] > 1.2)
+        # r,c = np.where(xyz_img[:,:,2] > 1.2)
+        r,c = np.where(xyz_img[:,:,2] > 1.16)
         xyz_img[r,c] = [0., 0., 0.]
 
     # crop only items inside bin
@@ -207,9 +209,9 @@ def read_sample(filename_color, filename_depth, camera_params):
     # if xyz_img is not None:
     #     xyz_img = xyz_img[234:726, 442:1036, :]
 
-    # im = cv2.resize(im, (640, 480))
-    # if xyz_img is not None:
-    #     xyz_img = cv2.resize(xyz_img, (640, 480), interpolation = cv2.INTER_NEAREST)
+    im = cv2.resize(im, (640, 480))
+    if xyz_img is not None:
+        xyz_img = cv2.resize(xyz_img, (640, 480), interpolation = cv2.INTER_NEAREST)
 
     im_tensor = torch.from_numpy(im) / 255.0
     pixel_mean = torch.tensor(cfg.PIXEL_MEANS / 255.0).float()
