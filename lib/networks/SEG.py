@@ -12,7 +12,8 @@ from networks.utils import log_softmax_high_dimension, softmax_high_dimension
 from networks.embedding import EmbeddingLoss
 from . import unets
 from . import resnet_dilated
-        
+import segmentation_models_pytorch as smp
+
 __all__ = [
     'seg_vgg_embedding', 'seg_unet_embedding', 'seg_resnet34_8s_embedding_early',
     'seg_resnet34_8s_embedding', 'seg_resnet50_8s_embedding',
@@ -66,9 +67,24 @@ class SEGNET(nn.Module):
             # decoder
             self.decoder = unets.UNet_Decoder(num_encoders=1, feature_dim=num_units, coordconv=use_coordconv)
         else:
-            self.fcn = getattr(resnet_dilated, network_name)(num_classes=num_units, input_channels=in_channels, pretrained=self.embedding_pretrain)
+            # self.fcn = getattr(resnet_dilated, network_name)(num_classes=num_units, input_channels=in_channels, pretrained=self.embedding_pretrain)
+            # if self.input_type == 'RGBD' and self.fusion_type != 'early':
+            #     self.fcn_depth = getattr(resnet_dilated, network_name)(num_classes=num_units, input_channels=in_channels, pretrained=False)
+
+            # use mobilenet instead of resnet
+            self.fcn = smp.Unet(
+                encoder_name="mobilenet_v2",
+                encoder_weights="imagenet",
+                in_channels=3,
+                classes=64,
+            )
             if self.input_type == 'RGBD' and self.fusion_type != 'early':
-                self.fcn_depth = getattr(resnet_dilated, network_name)(num_classes=num_units, input_channels=in_channels, pretrained=False)
+                self.fcn = smp.Unet(
+                    encoder_name="mobilenet_v2",
+                    encoder_weights="imagenet",
+                    in_channels=3,
+                    classes=64,
+                )
 
         if init_weights:
             self._initialize_weights()
