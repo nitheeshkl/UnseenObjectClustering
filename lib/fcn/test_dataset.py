@@ -406,6 +406,8 @@ def test_segnet(test_loader, network, output_dir, network_crop):
             )
         else:
             # save results
+            if not "filename" in sample:
+                sample["filename"] = os.path.join(output_dir, "%06d.jpg" % i)
             result = {
                 "labels": prediction,
                 "labels_refined": prediction_refined,
@@ -455,4 +457,3 @@ def test_segnet(test_loader, network, output_dir, network_crop):
         print("%s: %f" % (k, result_refined[k]))
     print(result_refined)
     print("========================================================")
-

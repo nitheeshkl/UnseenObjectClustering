@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 
-from ast import parse
-from cgi import test
 import sys
 import os
 import argparse
@@ -16,6 +14,7 @@ from multiprocessing import Pool, cpu_count
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import open3d as o3d
 import cv2
+
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -54,22 +53,23 @@ def show_imgs(rgb, depth, mask):
     plt.show()
     plt.close()
 
+
 def show_depth(depth):
     print("depth min={}, max={}".format(depth.min(), depth.max()))
-    plt.close('all')
+    plt.close("all")
     fig = plt.figure()
     im = plt.imshow(depth, interpolation="none")
 
     divider = make_axes_locatable(plt.gca())
-    cax = divider.append_axes('right', '5%', pad='3%')
+    cax = divider.append_axes("right", "5%", pad="3%")
     plt.colorbar(im, cax=cax)
     plt.tight_layout()
     plt.show()
     plt.close()
 
+
 class Generator:
-    
-    def __init__(self, src : str, dst : str, split : str, visualize : bool = False):
+    def __init__(self, src: str, dst: str, split: str, visualize: bool = False):
 
         if not os.path.exists(src):
             print("Error: {} not found".format(src))
@@ -79,8 +79,7 @@ class Generator:
         self.dst = dst
         self.split = split
         self.visualize = visualize
-        self.downscale = True # resize data to 640x480
-
+        self.downscale = True  # resize data to 640x480
 
         print("loading source dataset from ", self.src)
 
@@ -116,24 +115,26 @@ class Generator:
     def compute_xyz(self, depth, camera_params, scaled=False):
         height = depth.shape[0]
         width = depth.shape[1]
-        img_height = camera_params['height']
-        img_width = camera_params['width']
-        fx = camera_params['fx']
-        fy = camera_params['fy']
+        img_height = camera_params["height"]
+        img_width = camera_params["width"]
+        fx = camera_params["fx"]
+        fy = camera_params["fy"]
         if "x_offset" in camera_params.keys():
-            px = camera_params['x_offset']
-            py = camera_params['y_offset']
+            px = camera_params["x_offset"]
+            py = camera_params["y_offset"]
         else:
-            px = camera_params['cx']
-            py = camera_params['cy']
+            px = camera_params["cx"]
+            py = camera_params["cy"]
 
-        indices =  np.indices((height, width), dtype=np.float32).transpose(1,2,0) #[H,W,2]
+        indices = np.indices((height, width), dtype=np.float32).transpose(
+            1, 2, 0
+        )  # [H,W,2]
 
         if scaled:
             scale_x = width / img_width
             scale_y = height / img_height
         else:
-            scale_x, scale_y = 1., 1.
+            scale_x, scale_y = 1.0, 1.0
 
         # print("scale = ({},{})".format(scale_x, scale_y))
 
@@ -143,15 +144,15 @@ class Generator:
         z = depth
         x = (indices[..., 1] - px) * z / fx
         y = (indices[..., 0] - py) * z / fy
-        xyz_img = np.stack([x,y,z], axis=-1) # [H,W,3]
+        xyz_img = np.stack([x, y, z], axis=-1)  # [H,W,3]
 
         return xyz_img
 
     def __get_color(self, img_idx: str) -> np.ndarray:
-        rgb_img = np.array(Image.open(self.src_rgb_dir +"/{}.png".format(img_idx)))
+        rgb_img = np.array(Image.open(self.src_rgb_dir + "/{}.png".format(img_idx)))
 
         if self.downscale:
-            rgb_img = cv2.resize(rgb_img[120:,:,:], (640, 480))
+            rgb_img = cv2.resize(rgb_img[120:, :, :], (640, 480))
 
         return rgb_img
 
@@ -159,14 +160,16 @@ class Generator:
         mask_img = np.array(Image.open(self.src_mask_dir + "/{}.png".format(img_idx)))
 
         if self.downscale:
-            mask_img = cv2.resize(mask_img[120:,:], (640, 480), interpolation=cv2.INTER_NEAREST)
+            mask_img = cv2.resize(
+                mask_img[120:, :], (640, 480), interpolation=cv2.INTER_NEAREST
+            )
 
         return mask_img
 
-    def __get_points(self, img_idx:str ) -> np.ndarray:
+    def __get_points(self, img_idx: str) -> np.ndarray:
 
         depth = np.load(self.src_depth_dir + "/{}.npy".format(img_idx))
-        depth = depth / 1000. # mm to m
+        depth = depth / 1000.0  # mm to m
         cam_pose = np.load(self.src_cam_pose_dir + "/{}.npy".format(img_idx))
         cam_params = None
         with open(self.src + "/camera.json") as f:
@@ -178,12 +181,14 @@ class Generator:
 
         # create o3d point cloud structure
         structured_points = self.compute_xyz(depth, cam_params)
-        points = structured_points.reshape(-1,3)
+        points = structured_points.reshape(-1, 3)
         pcd = o3d.geometry.PointCloud()
         pcd.points = o3d.utility.Vector3dVector(points)
 
         # compute normals
-        pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.01, max_nn=15))
+        pcd.estimate_normals(
+            search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.01, max_nn=15)
+        )
         norm_pcd = pcd.normalize_normals()
         normals = np.asarray(norm_pcd.normals).reshape(H, W, 3)
 
@@ -193,7 +198,9 @@ class Generator:
         dot_prod = np.abs(np.dot(normals, unit_vec))
         mask = (dot_prod > np.cos(np.radians(75))).astype(float)
 
-        result = (structured_points * mask.reshape(H,W,1)).astype(structured_points.dtype)
+        result = (structured_points * mask.reshape(H, W, 1)).astype(
+            structured_points.dtype
+        )
 
         if self.downscale:
             result = cv2.resize(result, (640, 480), interpolation=cv2.INTER_NEAREST)
@@ -206,12 +213,14 @@ class Generator:
         points = self.__get_points(img_idx)
 
         H, W = mask_img.shape
-        fg_mask = (mask_img!=1).astype(float).reshape(H,W,1) # create foreground mask including container
+        fg_mask = (
+            (mask_img != 1).astype(float).reshape(H, W, 1)
+        )  # create foreground mask including container
 
         # filter background from rgb and depth
         rgb_img = (rgb_img * fg_mask).astype(rgb_img.dtype)
         points = (points * fg_mask).astype(points.dtype)
-        points[np.where(points[:,:,2] > 2.)] = [0, 0, 0]
+        points[np.where(points[:, :, 2] > 2.0)] = [0, 0, 0]
         # remove background and container from label mask
         mask_img[np.where(mask_img < 4)] = 0
 
@@ -228,12 +237,11 @@ class Generator:
 
         plt.figure()
         plt.tight_layout()
-        plt.imshow(points[:,:,2])
+        plt.imshow(points[:, :, 2])
         plt.savefig(self.dst_depth_img_dir + "/{}.png".format(img_idx))
         plt.close()
 
         return img_idx
-
 
     def generate(self):
 
@@ -245,7 +253,7 @@ class Generator:
 
                 rgb_img, mask_img, points = self.__get_data(img_idx)
 
-                show_imgs(rgb_img, points[:,:,2], mask_img)
+                show_imgs(rgb_img, points[:, :, 2], mask_img)
                 # show_depth(partial_depth)
 
                 pbar.set_description("{}".format(img_idx))
@@ -256,11 +264,16 @@ class Generator:
             # num_cpus = cpu_count()
             num_cpus = 8
             with Pool(processes=num_cpus) as pool:
-                for idx in tqdm(pool.imap(self.process_file, self.rgb_imgs), total=len(self.rgb_imgs)):
+                for idx in tqdm(
+                    pool.imap(self.process_file, self.rgb_imgs),
+                    total=len(self.rgb_imgs),
+                ):
                     dst_file_indices.append(idx)
 
             if len(dst_file_indices) != len(self.rgb_imgs):
-                print("missed {} files".format(len(dst_file_indices) - len(self.rgb_imgs)))
+                print(
+                    "missed {} files".format(len(dst_file_indices) - len(self.rgb_imgs))
+                )
 
             # create splits
             print("creating {} split...".format(self.split))
@@ -272,8 +285,12 @@ class Generator:
             if self.split == "trainval":
                 # if trainval split, then create separate train and val splits
                 num_train_indices = int(num_indices * 0.9)
-                np.save(self.dst + "/train.npy", rand_dst_file_indices[:num_train_indices])
-                np.save(self.dst + "/val.npy", rand_dst_file_indices[num_train_indices:])
+                np.save(
+                    self.dst + "/train.npy", rand_dst_file_indices[:num_train_indices]
+                )
+                np.save(
+                    self.dst + "/val.npy", rand_dst_file_indices[num_train_indices:]
+                )
             else:
                 np.save(self.dst + "/{}.npy".format(self.split), rand_dst_file_indices)
 
