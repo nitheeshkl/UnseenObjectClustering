@@ -17,6 +17,95 @@ import cv2
 import h5py
 
 
+objID_to_modelName = {
+    "hope_3": "butter",
+    "hope_6": "cookies",
+    "hope_8": "cheese",
+    "hope_12": "mac_cheese",
+    "hope_23": "raisins",
+    "hope_5": "pudding",
+    "hope_9": "granola",
+    "hope_22": "popcorn",
+    "hope_25": "spaghetti",
+    "ruapc_2": "cheez_it",
+    "ycbv_2": "cheez_it_deformed",
+    "ruapc_3": "crayola",
+    "ycbv_3": "domino_deformed",
+    "ruapc_5": "expo_eraser",
+    "hb_18": "jaffa_cakes_deformed",
+    "ycbv_7": "jello_chocolate_deformed",
+    "ycbv_8": "jello_strawberry_deformed",
+    "hb_29": "nelson_tea",
+    "ruapc_12": "oreo",
+    "ruapc_13": "papermate_pen",
+    "tyol_14": "plain_cracker",
+    "ruapc_1": "spark_plug",
+    "ruapc_8": "stick_straw",
+    "ruapc_9": "sticky_notes",
+    "tyol_2": "sudoku_book",
+}
+
+modelName_to_objID = {
+    "butter": "hope_3",
+    "cookies": "hope_6",
+    "cheese": "hope_8",
+    "mac_cheese": "hope_12",
+    "raisins": "hope_23",
+    "pudding": "hope_5",
+    "granola": "hope_9",
+    "popcorn": "hope_22",
+    "spaghetti": "hope_25",
+    "cheez_it": "ruapc_2",
+    "cheez_it_deformed": "ycbv_2",
+    "crayola": "ruapc_3",
+    "domino_deformed": "ycbv_3",
+    "expo_eraser": "ruapc_5",
+    "jaffa_cakes_deformed": "hb_18",
+    "jello_chocolate_deformed": "ycbv_7",
+    "jello_strawberry_deformed": "ycbv_8",
+    "nelson_tea": "hb_29",
+    "oreo": "ruapc_12",
+    "papermate_pen": "ruapc_13",
+    "plain_cracker": "tyol_14",
+    "spark_plug": "ruapc_1",
+    "stick_straw": "ruapc_8",
+    "sticky_notes": "ruapc_9",
+    "sudoku_book": "tyol_2",
+}
+
+train_objects = [
+    "butter",
+    "cookies",
+    "cheese",
+    "mac_cheese",
+    "raisins",
+    "pudding",
+    "granola",
+    "popcorn",
+    "spaghetti",
+]
+val_objects = [
+    "cheez_it_deformed",
+    "jello_chocolate_deformed",
+    "expo_eraser",
+    "nelson_tea",
+]
+test_objects = [
+    "cheez_it",
+    "crayola",
+    "domino_deformed",
+    "jaffa_cakes_deformed",
+    "jello_strawberry_deformed",
+    "oreo",
+    "papermate_pen",
+    "plain_cracker",
+    "spark_plug",
+    "stick_straw",
+    "sticky_notes",
+    "sudoku_book",
+]
+
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description="Generate dataset for UCN from synthetic data generated from blenderproc"
@@ -40,32 +129,53 @@ def parse_args():
     return args
 
 
-def show_imgs(rgb, depth, mask):
-    fig, axs = plt.subplots(nrows=1, ncols=3, figsize=(12, 3), constrained_layout=True)
-    axs[0].imshow(rgb)
-    axs[0].set_title("RGB")
-    axs[0].axis("off")
-    axs[1].imshow(depth)
-    axs[1].set_title("Depth")
-    axs[1].axis("off")
-    axs[2].imshow(mask)
-    axs[2].set_title("SegMask")
-    axs[2].axis("off")
-    plt.show()
+def visualize_imgs(rgb, depth, mask, show=False, saveFile=None):
+
+    plt.close("all")
+    fig = plt.figure(figsize=(24, 6))
+    # rgb
+    ax1 = fig.add_subplot(131)
+    ax1.imshow(rgb)
+    ax1.set_title("Color")
+    ax1.axis("off")
+    # depth
+    ax2 = fig.add_subplot(132)
+    im = ax2.imshow(depth, interpolation="None", cmap="turbo")
+    ax2.set_title("Depth")
+    ax2.axis("off")
+    divider = make_axes_locatable(ax2)
+    cax = divider.append_axes("right", size="5%", pad=0)
+    fig.colorbar(im, cax=cax, orientation="vertical")
+    # mask
+    ax2 = fig.add_subplot(133)
+    ax2.imshow(mask, interpolation="none", cmap="jet")
+    ax2.set_title("Instance Mask")
+    ax2.axis("off")
+
+    plt.tight_layout(pad=1.5)
+    if saveFile is not None:
+        plt.savefig(saveFile, dpi=300)
+    if show:
+        plt.show()
     plt.close()
 
 
-def show_depth(depth):
-    print("depth min={}, max={}".format(depth.min(), depth.max()))
+def visualize_depth(depth, show=False, saveFile=None, showColorbar=False):
+    # print("depth min={}, max={}".format(depth.min(), depth.max()))
+
     plt.close("all")
     fig = plt.figure()
-    im = plt.imshow(depth, interpolation="none")
-
-    divider = make_axes_locatable(plt.gca())
-    cax = divider.append_axes("right", "5%", pad="3%")
-    plt.colorbar(im, cax=cax)
-    plt.tight_layout()
-    plt.show()
+    im = plt.imshow(depth, interpolation="none", cmap="turbo")
+    plt.axis("off")
+    if showColorbar:
+        divider = make_axes_locatable(plt.gca())
+        cax = divider.append_axes("right", "5%", pad="3%")
+        plt.colorbar(im, cax=cax)
+    plt.tight_layout(pad=0)
+    if saveFile is not None:
+        plt.savefig(saveFile)
+    if show:
+        plt.show()
     plt.close()
 
 
@@ -91,13 +201,37 @@ class Generator:
         self.src_cam_pose_dir = os.path.join(self.src, "cam_pose")
 
         print("reading files...")
-        random_files = sorted(
-            glob.glob(os.path.join(self.src_hdf5_dir, "*/random/*/*.hdf5"))
-        )
-        ordered_files = sorted(
-            glob.glob(os.path.join(self.src_hdf5_dir, "*/ordered/*/*.hdf5"))
-        )
-        self.all_files = sorted(random_files + ordered_files)
+        objects = []
+        if split == "train":
+            objects = train_objects
+        elif split == "val":
+            objects = val_objects
+        elif split == "test":
+            objects = test_objects
+
+        random_files = []
+        ordered_files = []
+        for obj in objects:
+            random_files += sorted(
+                glob.glob(
+                    os.path.join(
+                        self.src_hdf5_dir,
+                        modelName_to_objID[obj],
+                        "random/*/*.hdf5",
+                    )
+                )
+            )
+            ordered_files += sorted(
+                glob.glob(
+                    os.path.join(
+                        self.src_hdf5_dir,
+                        modelName_to_objID[obj],
+                        "ordered/*/*.hdf5",
+                    )
+                )
+            )
+        self.all_files = random_files + ordered_files
+
         # self.rgb_imgs = sorted(glob.glob(os.path.join(self.src_rgb_dir, "*.png")))
         print("found {} hdf5 files".format(len(self.all_files)))
 
@@ -120,6 +254,10 @@ class Generator:
         if not os.path.exists(self.dst_depth_img_dir):
             print("creating ", self.dst_depth_img_dir)
             os.makedirs(self.dst_depth_img_dir)
+        self.dst_visualization_dir = os.path.join(self.dst, "visualization")
+        if not os.path.exists(self.dst_visualization_dir):
+            print("creating ", self.dst_visualization_dir)
+            os.makedirs(self.dst_visualization_dir)
 
     def compute_xyz(self, depth, camera_params, scaled=False):
         height = depth.shape[0]
@@ -244,7 +382,7 @@ class Generator:
     def __get_data_from_hdf5(self, hdf5_file: str) -> tuple:
         with h5py.File(hdf5_file) as f:
             rgb_img = np.asarray(f["colors"])
-            depth = np.asarray(f["depth"]) / 1000.0
+            depth = np.asarray(f["depth"])
             mask_img = np.asarray(f["instance_segmaps"])
             cam_pose = np.asarray(f["cam_pose"])
             points = self.__depth_to_points(depth, cam_pose)
@@ -266,16 +404,28 @@ class Generator:
     def process_file(self, args) -> None:
         hdf5_file, img_idx = args
         rgb_img, mask_img, points = self.__get_data_from_hdf5(hdf5_file)
+        depth = points[:, :, 2]
 
-        Image.fromarray(rgb_img).save(self.dst_rgb_dir + "/{}.png".format(img_idx))
-        np.save(self.dst_depth_dir + "/{}.npy".format(img_idx), points)
-        Image.fromarray(mask_img).save(self.dst_mask_dir + "/{}.png".format(img_idx))
+        Image.fromarray(rgb_img).save(self.dst_rgb_dir + "/{:08d}.png".format(img_idx))
+        np.save(self.dst_depth_dir + "/{:08d}.npy".format(img_idx), points)
+        Image.fromarray(mask_img).save(
+            self.dst_mask_dir + "/{:08d}.png".format(img_idx)
+        )
 
-        plt.figure()
-        plt.tight_layout()
-        plt.imshow(points[:, :, 2])
-        plt.savefig(self.dst_depth_img_dir + "/{}.png".format(img_idx))
-        plt.close()
+        visualize_depth(
+            depth,
+            show=False,
+            saveFile=self.dst_depth_img_dir + "/{:08d}.jpg".format(img_idx),
+            showColorbar=False,
+        )
+
+        visualize_imgs(
+            rgb_img,
+            depth,
+            mask_img,
+            show=False,
+            saveFile=self.dst_visualization_dir + "/{:08d}.jpg".format(img_idx),
+        )
 
         return img_idx
 
@@ -290,16 +440,16 @@ class Generator:
 
                 rgb_img, mask_img, points = self.__get_data_from_hdf5(hdf5_file)
 
-                show_imgs(rgb_img, points[:, :, 2], mask_img)
-                # show_depth(partial_depth)
+                visualize_imgs(rgb_img, points[:, :, 2], mask_img, show=True)
+                # visualize_depth(points[:, :, 2], show=True, showColorbar=True)
 
                 pbar.set_description("{}".format(img_idx))
                 pbar.refresh()
         else:
 
             dst_file_indices = []
-            # num_cpus = cpu_count()
-            num_cpus = 8
+            num_cpus = cpu_count()
+            # num_cpus = 8
             with get_context("spawn").Pool(processes=num_cpus) as pool:
                 for idx in tqdm(
                     pool.imap(
@@ -324,17 +474,7 @@ class Generator:
             rand_indices = np.random.permutation(num_indices)
             rand_dst_file_indices = dst_file_indices[rand_indices]
 
-            if self.split == "trainval":
-                # if trainval split, then create separate train and val splits
-                num_train_indices = int(num_indices * 0.9)
-                np.save(
-                    self.dst + "/train.npy", rand_dst_file_indices[:num_train_indices]
-                )
-                np.save(
-                    self.dst + "/val.npy", rand_dst_file_indices[num_train_indices:]
-                )
-            else:
-                np.save(self.dst + "/{}.npy".format(self.split), rand_dst_file_indices)
+            np.save(self.dst + "/{}.npy".format(self.split), rand_dst_file_indices)
 
             shutil.copyfile(
                 os.path.join(self.src, "camera.json"),
