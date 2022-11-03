@@ -155,14 +155,19 @@ def validate_segnet(val_loader, network, epoch):
                 "val_intra_cluster_loss": intra_cluster_loss,
                 "val_inter_cluster_loss": inter_cluster_loss,
                 "step_idx": start_step + i,
-                "val_image": wandb_img,
-                "val_depth_img": wandb.Image(depth_img),
-                "val_features": wandb.Image(features_img),
-                "val_features_rgb": wandb.Image(features_rgb_img),
-                "val_features_depth": wandb.Image(features_depth_img),
-                "val_point_cloud": wandb.Object3D(points),
             }
         )
+        if (start_step + i) % 100 == 0:
+            wandb.log(
+                {
+                    "val_image": wandb_img,
+                    "val_depth_img": wandb.Image(depth_img),
+                    "val_features": wandb.Image(features_img),
+                    "val_features_rgb": wandb.Image(features_rgb_img),
+                    "val_features_depth": wandb.Image(features_depth_img),
+                    "val_point_cloud": wandb.Object3D(points),
+                }
+            )
 
         print(
             "[%d/%d][%d/%d], loss %.4f, loss intra: %.4f, loss_inter %.4f, time %.2f"
@@ -180,12 +185,7 @@ def validate_segnet(val_loader, network, epoch):
 
         torch.cuda.empty_cache()
 
-    wandb.log(
-        {
-            "val_avg_loss": avg_loss.val,
-            "epoch": epoch
-        }
-    )
+    wandb.log({"val_avg_loss": avg_loss.val, "epoch": epoch})
 
 
 def train_segnet(train_loader, network, optimizer, epoch):
@@ -215,8 +215,8 @@ def train_segnet(train_loader, network, optimizer, epoch):
             intra_cluster_loss,
             inter_cluster_loss,
             features,
-            # features_rgb,
-            # features_depth,
+            features_rgb,
+            features_depth,
         ) = network(image, label, depth)
         loss = torch.sum(loss)
         intra_cluster_loss = torch.sum(intra_cluster_loss)
@@ -258,8 +258,8 @@ def train_segnet(train_loader, network, optimizer, epoch):
         wandb_img = wandb.Image(rgb_img, masks={"GT": {"mask_data": rgb_mask}})
 
         features_img = feature_tensor_to_img(features)
-        # features_rgb_img = feature_tensor_to_img(features_rgb)
-        # features_depth_img = feature_tensor_to_img(features_depth)
+        features_rgb_img = feature_tensor_to_img(features_rgb)
+        features_depth_img = feature_tensor_to_img(features_depth)
 
         wandb.log(
             {
@@ -276,8 +276,8 @@ def train_segnet(train_loader, network, optimizer, epoch):
                     "image": wandb_img,
                     "depth": wandb.Image(depth_img),
                     "features": wandb.Image(features_img),
-                    # "features_rgb": wandb.Image(features_rgb_img),
-                    # "features_depth": wandb.Image(features_depth_img),
+                    "features_rgb": wandb.Image(features_rgb_img),
+                    "features_depth": wandb.Image(features_depth_img),
                     "point_cloud": wandb.Object3D(points),
                 }
             )
@@ -298,9 +298,4 @@ def train_segnet(train_loader, network, optimizer, epoch):
         )
         cfg.TRAIN.ITERS += 1
 
-    wandb.log(
-        {
-            "train_avg_loss": avg_loss.val,
-            "epoch": epoch
-        }
-    )
+    wandb.log({"train_avg_loss": avg_loss.val, "epoch": epoch})

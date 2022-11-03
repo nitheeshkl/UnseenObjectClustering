@@ -42,8 +42,7 @@ data_loading_params = {
 
 
 def compute_xyz(depth_img: np.ndarray, camera_params: dict) -> np.ndarray:
-    """ Compute ordered point clouds from recorded depth image and camera intrinsics.
-    """
+    """Compute ordered point clouds from recorded depth image and camera intrinsics."""
 
     # FIXME: Handle computing xyz from a rescaled image in a better way.
     img_height = depth_img.shape[0]
@@ -103,20 +102,22 @@ class UcnSynDataset(data.Dataset, datasets.imdb):
         return self._size
 
     def _get_default_path(self):
-        return os.path.join(datasets.ROOT_DIR, "data", "ucn_syn")
+        return os.path.join(datasets.ROOT_DIR, "data", "ucn_syn_" + self._image_set)
 
     def __getitem__(self, index: int):
 
         file_index = self._indices[index]
         rgb_file = os.path.join(
-            self._ucn_syn_dataset_path, "rgb", "{}.png".format(file_index)
+            self._ucn_syn_dataset_path, "rgb", "{:08d}.png".format(file_index)
         )
         depth_file = os.path.join(
             # self._ucn_syn_dataset_path, "depth", "{}.png".format(file_index)
-            self._ucn_syn_dataset_path, "depth", "{}.npy".format(file_index)
+            self._ucn_syn_dataset_path,
+            "depth",
+            "{:08d}.npy".format(file_index),
         )
         mask_file = os.path.join(
-            self._ucn_syn_dataset_path, "mask", "{}.png".format(file_index)
+            self._ucn_syn_dataset_path, "mask", "{:08d}.png".format(file_index)
         )
 
         # label
@@ -134,7 +135,9 @@ class UcnSynDataset(data.Dataset, datasets.imdb):
             # xyz_img = self.process_depth(depth_img)
             xyz_img = np.load(depth_file)
             if self.params["use_data_augmentation"]:
-                xyz_img = augmentation.add_noise_to_xyz(xyz_img, xyz_img[:,:,2], self.params)
+                xyz_img = augmentation.add_noise_to_xyz(
+                    xyz_img, xyz_img[:, :, 2], self.params
+                )
                 xyz_img = augmentation.dropout_random_ellipses_xyz(xyz_img, self.params)
         else:
             xyz_img = None

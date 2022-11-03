@@ -223,7 +223,7 @@ if __name__ == "__main__":
         )
     cfg.epochs = args.epochs
 
-    wandb.init(project="UCN", entity="kln-ucn")
+    wandb.init(project="UCN", entity="kln")
 
     wandb.config = {
         "learning_rate": cfg.TRAIN.LEARNING_RATE,
@@ -239,7 +239,7 @@ if __name__ == "__main__":
 
         # train for one epoch
         train_segnet(dataloader, network, optimizer, epoch)
-        torch.cuda.empty_cache()
+        # torch.cuda.empty_cache()
         validate_segnet(val_dataloader, network, epoch)
 
         # save checkpoint
