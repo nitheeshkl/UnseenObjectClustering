@@ -223,6 +223,8 @@ class SEGNET(nn.Module):
         # normalization
         if self.normalize:
             features = F.normalize(features, p=2, dim=1)
+            features_rgb = F.normalize(features_rgb, p=2, dim=1)
+            features_depth = F.normalize(features_depth, p=2, dim=1)
             # torch.save(features, "tmp/features/features_fused_normalized_{:06d}{}.pt".format(idx, "_crop" if crop else ''))
         if self.training:
             loss, intra_cluster_loss, inter_cluster_loss = self.embedding_loss(

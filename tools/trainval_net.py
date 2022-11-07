@@ -139,7 +139,7 @@ if __name__ == "__main__":
     worker_init_fn = (
         dataset.worker_init_fn if hasattr(dataset, "worker_init_fn") else None
     )
-    num_workers = 2
+    num_workers = 4
     dataloader = torch.utils.data.DataLoader(
         dataset,
         batch_size=cfg.TRAIN.IMS_PER_BATCH,
@@ -149,18 +149,18 @@ if __name__ == "__main__":
     )
     print("Use dataset `{:s}` for training".format(dataset.name))
 
-    val_worker_init_fn = (
-        val_dataset.worker_init_fn if hasattr(val_dataset, "worker_init_fn") else None
-    )
-    val_num_workers = 2
-    val_dataloader = torch.utils.data.DataLoader(
-        val_dataset,
-        batch_size=4,
-        shuffle=True,
-        num_workers=val_num_workers,
-        worker_init_fn=val_worker_init_fn,
-    )
-    print("Use dataset `{:s}` for validation".format(val_dataset.name))
+    # val_worker_init_fn = (
+    #     val_dataset.worker_init_fn if hasattr(val_dataset, "worker_init_fn") else None
+    # )
+    # val_num_workers = 4
+    # val_dataloader = torch.utils.data.DataLoader(
+    #     val_dataset,
+    #     batch_size=cfg.TRAIN.IMS_PER_BATCH,
+    #     shuffle=True,
+    #     num_workers=val_num_workers,
+    #     worker_init_fn=val_worker_init_fn,
+    # )
+    # print("Use dataset `{:s}` for validation".format(val_dataset.name))
     # overwrite intrinsics
     if len(cfg.INTRINSICS) > 0:
         K = np.array(cfg.INTRINSICS).reshape(3, 3)
@@ -239,8 +239,8 @@ if __name__ == "__main__":
 
         # train for one epoch
         train_segnet(dataloader, network, optimizer, epoch)
-        # torch.cuda.empty_cache()
-        validate_segnet(val_dataloader, network, epoch)
+        torch.cuda.empty_cache()
+        # validate_segnet(val_dataloader, network, epoch)
 
         # save checkpoint
         if (epoch + 1) % cfg.TRAIN.SNAPSHOT_EPOCHS == 0 or epoch == args.epochs - 1:

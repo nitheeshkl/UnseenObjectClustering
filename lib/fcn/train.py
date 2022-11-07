@@ -105,8 +105,8 @@ def validate_segnet(val_loader, network, epoch):
             depth = sample["depth"].cuda()
         else:
             depth = None
-        label = sample["label"].cuda()
 
+        label = sample["label"].cuda()
         (
             loss,
             intra_cluster_loss,
@@ -119,7 +119,7 @@ def validate_segnet(val_loader, network, epoch):
         intra_cluster_loss = torch.sum(intra_cluster_loss)
         inter_cluster_loss = torch.sum(inter_cluster_loss)
 
-        out_label, selected_pixels = clustering_features(features, num_seeds=100)
+        # out_label, selected_pixels = clustering_features(features.detach().cpu(), num_seeds=100)
 
         # measure elapsed time
         batch_time.update(time.time() - end)
@@ -138,7 +138,9 @@ def validate_segnet(val_loader, network, epoch):
         depth = points[:, :, 2]
         depth_img = (depth / depth.max()) * 255
         points = points.reshape(-1, 3)
-        mask = out_label[0].permute([1, 2, 0]).detach().cpu().numpy()
+        # mask = out_label[0].permute([1, 0]).detach().cpu().numpy()
+        # rgb_mask = mask + 1
+        mask = sample["label"][0].permute([1, 2, 0]).detach().cpu().numpy()
         rgb_mask = mask.squeeze(2) + 1
         points_mask = mask.reshape(-1, 1) + 2
         points = np.concatenate([points, points_mask], axis=1)
@@ -157,7 +159,7 @@ def validate_segnet(val_loader, network, epoch):
                 "step_idx": start_step + i,
             }
         )
-        if (start_step + i) % 100 == 0:
+        if (start_step + i) % 10 == 0:
             wandb.log(
                 {
                     "val_image": wandb_img,
@@ -183,12 +185,15 @@ def validate_segnet(val_loader, network, epoch):
             )
         )
 
+        del image, depth, points, depth_img, mask, rgb_img, # out_label
+        del features, features_rgb, features_depth, features_img, features_rgb_img, features_depth_img
+        del loss, inter_cluster_loss, intra_cluster_loss
         torch.cuda.empty_cache()
 
     wandb.log({"val_avg_loss": avg_loss.val, "epoch": epoch})
 
 
-def train_segnet(train_loader, network, optimizer, epoch):
+def train_segnet(train_loader, network, optimizer, epoch, val=False):
 
     batch_time = AverageMeter()
     epoch_size = len(train_loader)
@@ -261,30 +266,32 @@ def train_segnet(train_loader, network, optimizer, epoch):
         features_rgb_img = feature_tensor_to_img(features_rgb)
         features_depth_img = feature_tensor_to_img(features_depth)
 
+        prefix = 'train'
         wandb.log(
             {
-                "train_loss": loss,
-                "intra_cluster_loss": intra_cluster_loss,
-                "inter_cluster_loss": inter_cluster_loss,
-                "step_idx": start_step + i,
+                prefix + "_loss": loss,
+                prefix + "_intra_cluster_loss": intra_cluster_loss,
+                prefix + "_inter_cluster_loss": inter_cluster_loss,
+                prefix + "_step_idx": start_step + i,
             }
         )
 
         if (start_step + i) % 100 == 0:
             wandb.log(
                 {
-                    "image": wandb_img,
-                    "depth": wandb.Image(depth_img),
-                    "features": wandb.Image(features_img),
-                    "features_rgb": wandb.Image(features_rgb_img),
-                    "features_depth": wandb.Image(features_depth_img),
-                    "point_cloud": wandb.Object3D(points),
+                    prefix + "_image": wandb_img,
+                    prefix + "_depth": wandb.Image(depth_img),
+                    prefix + "_features": wandb.Image(features_img),
+                    prefix + "_features_rgb": wandb.Image(features_rgb_img),
+                    prefix + "_features_depth": wandb.Image(features_depth_img),
+                    prefix + "_point_cloud": wandb.Object3D(points),
                 }
             )
 
         print(
-            "[%d/%d][%d/%d], loss %.4f, loss intra: %.4f, loss_inter %.4f, lr %.6f, time %.2f"
+            "[%s][%d/%d][%d/%d], loss %.4f, loss intra: %.4f, loss_inter %.4f, lr %.6f, time %.2f"
             % (
+                prefix,
                 epoch,
                 cfg.epochs,
                 i,
@@ -297,5 +304,10 @@ def train_segnet(train_loader, network, optimizer, epoch):
             )
         )
         cfg.TRAIN.ITERS += 1
+
+        del image, depth, points, depth_img, mask, rgb_img, # out_label
+        del features, features_rgb, features_depth, features_img, features_rgb_img, features_depth_img
+        del loss, inter_cluster_loss, intra_cluster_loss
+        torch.cuda.empty_cache()
 
     wandb.log({"train_avg_loss": avg_loss.val, "epoch": epoch})

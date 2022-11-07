@@ -12,4 +12,4 @@ export PYTHONUNBUFFERED="True"
   --dataset-val ucn_syn_dataset_val \
   --cfg experiments/cfgs/seg_resnet34_8s_embedding_cosine_rgbd_add_ucn_syn.yml \
   --solver adam \
-  --epochs 32
+  --epochs 20
